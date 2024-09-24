@@ -11,17 +11,22 @@ import zarr
 from torch.utils import data
 from torch.linalg import svd
 
-def get_eigenimages(hsi_data):
+def get_eigenimages(hsi_data, return_eigenvalues=False):
 
-    b,c,h,w = hsi_data.shape
-    assert b == 1, "Batch size must be 1"
+    assert len(hsi_data.shape) == 4, "Input must be a 4D tensor of shape [batch, channels, height, width]"
 
-    hsi_data = hsi_data.reshape(b*c,h*w)
-    u, s, v = svd(hsi_data, full_matrices=False)
-    acp = (u[:, :3] @ torch.diag(s[:3]) @ v[:3]).reshape(hsi_data.shape)
-    # acp = (acp - acp.min()) / (acp.max() - acp.min())
+    # Reshape HSI cubes to matrices of size [number of bands, number of pixels]
+    x_mat = hsi_data.reshape(hsi_data.shape[1], -1)
+    # Singular Value Decomposition of noisy and true HSI
+    U, s, V = svd(x_mat, full_matrices=False)
+    # Eigenimages are the coefficient images of each HSI in the basis formed by its eigenvectors
+    Z_mat = torch.diag(s) @ V
+    Z = Z_mat.reshape(hsi_data.shape)
 
-    return acp.reshape(b,c,h,w), s 
+    if return_eigenvalues:
+        return Z, s
+    
+    return Z
 
 class HSIDataset(data.Dataset):
 
