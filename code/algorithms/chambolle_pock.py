@@ -142,7 +142,8 @@ class ChambollePock(nn.Module):
   
         loss = torch.zeros(self.max_iter)
 
-        print(f'Chambolle Pock algorithm starting...')
+        if verbose:
+            print(f'Chambolle Pock algorithm starting...')
         for it in range(self.max_iter):
             
             u_old = torch.clone(u)
