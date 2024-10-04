@@ -43,7 +43,9 @@ class HSIDataset(data.Dataset):
         self.wavenumbers = self.file.attrs['spectral_range']
         self.spatial_resolution = self.file.attrs['spatial_resolution (m)']
         self.spectral_resolution = self.file.attrs['spectral_resolution (nm)']
-        self.nband = len(self.wavenumbers)
+        self.nband = self.file[self.split][0][:].shape[2]
+        self.height = self.file[self.split][0][:].shape[0]
+        self.width = self.file[self.split][0][:].shape[1]
 
         pass
 
@@ -70,6 +72,10 @@ class HSIDataset(data.Dataset):
         pass
         
     def __getitem__(self, index):
+
+        if index >= len(self.file[self.split]):
+            raise IndexError("Index out of range")
+        
         hsi_data = self.file[self.split][index][:]
 
         if self.transform:
