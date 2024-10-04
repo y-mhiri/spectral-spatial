@@ -38,7 +38,7 @@ class TVGradAlignement(ChambollePock):
             Define the linear operator associated to the primal dual formulation of the problem
 
             $$
-            Ku(x,y) = \sum_{sigma} \nabla(u(x,y,\sigma)) 
+                Ku(x,y) = \sum_{sigma} W(x,y) \nabla(u(x,y,\sigma)) 
             $$
 
             :param Torch tensor u: Input hyper-spectral tensor of shape (batch, channels, height, width)
@@ -55,7 +55,7 @@ class TVGradAlignement(ChambollePock):
             Define the adjoint operator associated to the primal dual formulation of the problem
 
             $$
-                K^*q = (\nabla^*q, \nabla^*q, ..., \nabla^*q)^t
+                K^*q = ( \nabla^* W(x,y)^t q, \nabla^* W(x,y)^t q, ..., \nabla^* W(x,y)^t q)^t
             $$
 
             :param Torch tensor q: Input tensor of shape (batch, height, width, 2)
