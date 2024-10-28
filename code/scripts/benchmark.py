@@ -46,29 +46,34 @@ seed = 42
 torch.manual_seed(seed)
 
 # Define data path
-data_path = '/home/y/Documents/Data/HSI/datasets/harvard.zarr'
-out_path = '../results/harvard/tv_plus_grad_alignement.zarr'
+data_path = '/home/mhiriy/data/harvard.zarr'
+out_path = '../results/harvard/tv_plus_grad_alignement_v5.zarr'
 
 dataset_name = data_path.split('/')[-1].split('.')[0]
 algorithm = 'tv_plus_grad_alignement'
 
 # Choose subset of data
-n_data = 4
-data_idx = [6,17,22,42,8,43]
+data_idx = [43]#  ,42,8,43]
 
 # Noise level
 SNR = 10
 
 # Chambolle-Pock hyperparameters
-max_iter = 1
+max_iter = 100000
 sigma = 0.99
 tau = 0.99
 theta = 1.0
 
 # lambda_tv and mu range
 
-lmbda_range = [0.1]
-mu_range = [10.0]
+lmbda_range = [0.01,
+               0.05,
+               0.1]
+mu_range = [0,
+            0.1,
+            0.5,
+            1.0,
+            10.0]
 
 ###################################################
 ###################################################
@@ -125,8 +130,8 @@ residual_noise = torch.randn_like(dataset[0], device=device, dtype=dtype)
 
 trial_idx = 0
 for lmbda in root.attrs['lambda_range']:
-    trial_idx += 1
     for mu in root.attrs['mu_range']:
+        trial_idx += 1
         print(f"Running trial {trial_idx} : lambda = {lmbda}, mu = {mu}")
         print('-----------------------------------')  
         group = root.create_group(f'trial_{trial_idx:02d}')
@@ -145,7 +150,7 @@ for lmbda in root.attrs['lambda_range']:
             x = data.unsqueeze(0).to(device=device,dtype=dtype) 
 
             # Adds a small amount of white gaussian noise (sigma^2 = 1e-4) to avoid numerical issues
-            x += 1e-2*residual_noise
+            x += 1e-2*residual_noise/torch.norm(x)
 
             # Compute the panchromatic image from the ground truth HSI
             panc = torch.sum(x, dim=1).unsqueeze(1)/x.shape[1]
