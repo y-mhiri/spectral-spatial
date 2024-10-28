@@ -4,6 +4,7 @@ Defines a base class to implement Chambolle-Pock type algorithms.
 """
 import torch
 from torch import nn
+from tqdm.auto import tqdm
 
 class ChambollePock(nn.Module):
     """
@@ -144,7 +145,7 @@ class ChambollePock(nn.Module):
 
         if verbose:
             print(f'Chambolle Pock algorithm starting...')
-        for it in range(self.max_iter):
+        for it in tqdm(range(self.max_iter)):
             
             u_old = torch.clone(u)
 
