@@ -2,7 +2,7 @@ import torch
 
 from chambolle_pock import ChambollePock
 from math import sqrt
-from torch.linalg import svd
+from torch.linalg import svd, norm
 from nabla import nabla, nabla_adjoint
 
 
@@ -23,11 +23,13 @@ class TVGradAlignement(ChambollePock):
         grad_panc_orth[...,0] = grad_panc[...,1]
         grad_panc_orth[...,1] = -grad_panc[...,0]
 
-        norm_grad_panc = torch.norm(grad_panc, dim=-1,keepdim=True) + 1e-7
 
-        weight_tensor = torch.exp(-mu * norm_grad_panc) 
-        weight_tensor_perp = (2 - weight_tensor) * grad_panc_orth/norm_grad_panc
-        weight_tensor = weight_tensor * grad_panc/norm_grad_panc
+        norm_grad_panc = norm(grad_panc, dim=-1, keepdim=True) 
+        norm_grad_panc_mean = norm_grad_panc/torch.mean(norm(grad_panc, ord=2, dim=-1)) + 1e-7
+
+        weight_tensor = torch.exp(-mu * norm_grad_panc_mean) 
+        weight_tensor_perp = (2 - weight_tensor) * grad_panc_orth/(norm_grad_panc + 1e-7)
+        weight_tensor = weight_tensor * grad_panc/(norm_grad_panc + 1e-7)
 
         W = torch.stack((weight_tensor, weight_tensor_perp), dim=-1).transpose(4,5)
         # W = torch.kron(torch.ones_like(norm_grad_panc.unsqueeze(-1), device=device), torch.eye(2, device=device))
@@ -79,7 +81,7 @@ class TVGradAlignement(ChambollePock):
 
 
         """
-        return q / torch.maximum(torch.norm(q, dim=-1, keepdim=True), torch.ones_like(q))
+        return q / torch.maximum(norm(q, dim=-1, keepdim=True), torch.ones_like(q))
     
         
 
@@ -87,8 +89,8 @@ class TVGradAlignement(ChambollePock):
         r"""
         Compute the loss function of the problem
         """
-        f = lambda u: (1/(2*sigma2))*torch.norm(u - y)**2
-        reg = lambda p: lmbda*torch.sum(torch.norm(torch.matmul(self.W,nabla(p).unsqueeze(-1)).squeeze(-1),dim=-1))#.squeeze(-1), dim=-1)
+        f = lambda u: (1/(2*sigma2))*norm(u - y)**2
+        reg = lambda p: lmbda*torch.sum(norm(torch.matmul(self.W,nabla(p).unsqueeze(-1)).squeeze(-1),dim=-1))#.squeeze(-1), dim=-1)
 
         return f(u) + reg(u)
     
