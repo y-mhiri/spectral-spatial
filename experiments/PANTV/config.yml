@@ -1,0 +1,6 @@
+name: PANTV
+description: Benchmark a regularization that enforces the alignement of spatial gradient between the image bands with the panchromatic
+path: experiments/PANTV
+executable: experiments/PANTV/benchmark.py
+executable_command: python3
+
