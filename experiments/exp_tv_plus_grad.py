@@ -54,8 +54,7 @@ if __name__ == "__main__":
 
     print(f"I am a run. Evrything done here will be save to {args.storage_path}.")
     print("Here are all the args called : ")
-    for arg in args:
-        print(arg)
+    print(vars(args))
 
     # ###################################################
     # ###################################################
