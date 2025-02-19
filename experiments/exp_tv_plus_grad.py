@@ -112,7 +112,7 @@ if __name__ == "__main__":
     # Define Zarr output file
     ######
 
-    root = zarr.open(out_path, mode='w')
+    # root = zarr.open(out_path, mode='w')
 
 
     # ######
@@ -227,7 +227,7 @@ if __name__ == "__main__":
     # root.create_dataset(f'loss', data=loss_ar.cpu().numpy())
     # root.create_dataset(f'relvar', data=rel_ar.cpu().numpy())
     
-    root.close()
+    # root.close()
     
     print(f"All done here.")
 
