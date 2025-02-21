@@ -9,6 +9,6 @@ actions:
   - plot:
       name: plot
       executable: experiments/PANTV/actions/plots.py
-      executable_command: python
+      executable_command: python3
       description: Plot results
 
