@@ -143,7 +143,9 @@ if __name__ == "__main__":
 
     folder = args.storage_path
     root = zarr.open(f'{folder}/results.zarr', mode='r')
+    data_idx = 
 
+    ds = load_dataset(args.data_path)
 
     if args.noisy:
         residual_noise = root["residual_noise"]
