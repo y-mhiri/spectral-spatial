@@ -31,8 +31,7 @@ def generate_figure(data,
 
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    ax.plot(data[:].transpose(), label='Cost function',
-                marker='o', markersize=5, linestyle='')
+    ax.plot(data[:].transpose(), label='Cost function')
 
 #     # Fill between the standard deviation
 #     ax.fill_between(n_samples_list,
@@ -74,36 +73,7 @@ if __name__ == "__main__":
             '[bold green]Plotting evolution of the loss wrt the number of iterations.')
     rich.print('[bold green]Folder: {}'.format(args.storage_path))
 
-    # Check if subfolders with name "group_" exist
-    # Which means that several parameters have been
-    # estimated and stored in different folders
-    # if os.path.isdir(os.path.join(args.storage_path, 'group_0')):
-    #     folders = [os.path.join(args.storage_path, f) for f in
-    #                os.listdir(args.storage_path) if 'group_' in f
-    #                and os.path.isdir(os.path.join(args.storage_path, f))]
-    # else:
-        # folders = [args.storage_path]
     folder = args.storage_path
-
-    # We aggregate the results from all the folders if wanted
-    # if args.aggregate:
-    #     mse_covariance_mean = []
-    #     mse_covariance_std = []
-    #     trials_per_group = []
-    #     for folder in folders:
-
-    #         # Load results
-    #         with open(os.path.join(folder, 'results.pkl'), 'rb') as f:
-    #             results = pickle.load(f)
-
-    #         # Aggregate results
-    #         mse_covariance_mean.append(results['mse_covariance_mean'])
-    #         mse_covariance_std.append(results['mse_covariance_std'])
-    #         trials_range = results['trials_range']
-    #         trials_per_group.append(trials_range[1] - trials_range[0] + 1)
-    #         n_samples_list = results['n_samples_list']
-
-        # Read zarr output of run 
 
     root = zarr.open(f'{folder}/results.zarr', mode='r')
 
@@ -112,7 +82,5 @@ if __name__ == "__main__":
     generate_figure(loss_ar,
                     args.storage_path,
                     args.save)
-
-
 
     plt.show()

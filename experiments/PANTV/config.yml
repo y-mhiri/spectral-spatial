@@ -3,4 +3,12 @@ description: Benchmark a regularization that enforces the alignement of spatial 
 path: experiments/PANTV
 executable: experiments/PANTV/benchmark.py
 executable_command: python3
+datasets:
+  - harvard
+actions:
+  - plot:
+      name: plot
+      executable: experiments/PANTV/actions/plots.py
+      executable_command: python
+      description: Plot results
 

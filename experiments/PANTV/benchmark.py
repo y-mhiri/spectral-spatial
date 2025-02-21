@@ -33,7 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("--dtype", type=str, default="float32")
 
     parser.add_argument("--storage_path", type=str, required=True)
-    parser.add_argument("--data_path", type=str, default="/home/mhiriy/data/harvard.zarr")
+    parser.add_argument("--dataset_path", type=str)
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_iter", type=int, default=100)
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     torch.manual_seed(seed)
 
     # Define data path
-    data_path = args.data_path
+    data_path = args.dataset_path
     out_path = args.storage_path
 
     dataset_name = data_path.split('/')[-1].split('.')[0]

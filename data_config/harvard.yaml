@@ -1,0 +1,4 @@
+name: harvard
+description: Harvard dataset
+path: /home/mhiriy/data/harvard.zarr
+tags: []
