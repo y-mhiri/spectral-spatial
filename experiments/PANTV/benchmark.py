@@ -228,7 +228,6 @@ if __name__ == "__main__":
     root.create_dataset(f'loss', data=loss_ar.cpu().numpy())
     root.create_dataset(f'relvar', data=rel_ar.cpu().numpy())
     
-    root.close()
     
     print(f"All done here.")
 
