@@ -4,7 +4,7 @@ import numpy as np
 import zarr
 import matplotlib.pyplot as plt
 import seaborn as sns
-import tikzplotlib
+# import tikzplotlib
 import rich
 import sys
 from tqdm import tqdm
@@ -19,21 +19,19 @@ sns.set_style('darkgrid')
 
 # Activate LaTeX text rendering
 # if available on your system
-plt.rc('text', usetex=True)
+# plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 
 
 def generate_figure(data,
                     folder,
-                    scale='linear',
-                    subplot=False,
-                    save=False, **kwargs):
+                    save=True, **kwargs):
     
 
 
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    ax.plot(data, label='Cost function',
+    ax.plot(data[:].transpose(), label='Cost function',
                 marker='o', markersize=5, linestyle='')
 
 #     # Fill between the standard deviation
@@ -55,11 +53,10 @@ def generate_figure(data,
     ax.set_yscale('log')
 
     if save:
-        plt.savefig(os.path.join(folder, 'cost_function.pdf'),
-                    bbox_inches='tight')
+        plt.savefig(os.path.join(folder, 'cost_function.png'))
         # tikzplotlib_fix_ncols(fig)
-        tikzplotlib.save(os.path.join(folder, 'cost_function.tex'))
-        print('Saved plot in {}'.format(folder))
+        # tikzplotlib.save(os.path.join(folder, 'cost_function.tex'))
+        # print('Saved plot in {}'.format(folder))
 
 
 if __name__ == "__main__":
@@ -69,7 +66,7 @@ if __name__ == "__main__":
                         default='data/',
                         help='Path to the data folder where '
                         'results.pkl is located.')  
-    parser.add_argument('--save', action='store_true', default=False,
+    parser.add_argument('--save', action='store_true', default=True,
                         help='Save the plot as pdf and LaTeX code')
     args = parser.parse_args()
 
