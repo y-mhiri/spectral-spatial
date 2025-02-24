@@ -3,7 +3,7 @@ fixed_args:
         '--device': 'cpu'
         '--cuda_avail' : ''
         '--dtype' : 'float32'
-        '--image_idx' : '6 17'
+        '--image_idx' : '6, 17'
         '--crop_center' : ''
         '--crop_size' : 256 
         '--seed' : 42
