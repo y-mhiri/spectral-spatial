@@ -130,14 +130,20 @@ if __name__ == "__main__":
     parser.add_argument('--band_indices', type=int, nargs='+', help='Indices of the bands to show. No band images are displayed if None.')
     parser.add_argument('--eigen_indices', type=int, nargs='+', help='Indices of the eigenimages to show. No eigenimages are displayed if None.')
     parser.add_argument('--dataset', type=str, help='Name of the dataset to use. Default take the first dataset in the list.')
+    parser.add_argument('--group', type=int)
 
     args = parser.parse_args()
 
     rich.print('[bold green]Starting visualization process...')
 
     folder = args.storage_path
+    yaml_path = os.path.join(folder, 'info.yaml')
 
-    with open(os.path.join(folder, 'info.yaml'),'r') as f:
+    if args.group:
+        folder = os.path.join(folder, f'group_{args.group}')
+
+
+    with open(yaml_path,'r') as f:
         info = yaml.load(f, yaml.SafeLoader )
     
     
@@ -157,12 +163,16 @@ if __name__ == "__main__":
     ds, rgb_index = load_dataset(dataset_path, data_idx, crop, crop_size)
     idxs = args.idxs if args.idxs else range(len(ds))
 
+    fig_folder = os.path.join(folder, 'figures')
+    if not os.path.exists(fig_folder):
+        os.makedirs(fig_folder)
+
     viz_args = {
             'rgb_indices': rgb_index if args.rgb else None,
             'show_eigenimage': args.eigenimage,
             'band_indices': args.band_indices,
             'eigen_indices': args.eigen_indices,
-            'folder': folder
+            'folder': fig_folder
         }
 
     for idx in idxs:

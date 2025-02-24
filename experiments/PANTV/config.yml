@@ -8,7 +8,12 @@ datasets:
 actions:
   - plot:
       name: plot
-      executable: experiments/PANTV/actions/plots.py
+      executable: actions/plots.py
       executable_command: python3
-      description: Plot results
+      description: Plot cost function of optimization algorithms.
+  - show_hsi:
+      name: show_hsi
+      executable: actions/show_hsi.py
+      executable_command: python3
+      description: Save figures of hyperspectral images.
 
