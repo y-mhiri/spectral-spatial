@@ -131,6 +131,10 @@ if __name__ == "__main__":
         dataset = HSIDataset(root_dir=data_path, split='train', transform=val_transform, normalize=True)
 
     subset = torch.utils.data.Subset(dataset, data_idx)
+    
+    root.attrs['crop'] = crop
+    root.attrs['crop_size'] = crop_size
+    root.attrs['data_idx'] = data_idx
 
     ######
     # Define the solver parameters
