@@ -13,12 +13,76 @@ fixed_args:
 
 varying_args:
 
-    groups:
-        - options: # Group 1
-            '--mu': 0
-            '--lmbda': 0.001
-            '--noise_level' : 0.01
-        - options: # Group 2
-            '--mu': 1.0
-            '--lmbda': 0.001
-            '--noise_level' : 0.01
+    groups: 
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.001 
+            '--noise_level': 0.0001
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.001 
+            '--noise_level': 0.001
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.001 
+            '--noise_level': 0.01
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.002 
+            '--noise_level': 0.0001
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.002 
+            '--noise_level': 0.001
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.002 
+            '--noise_level': 0.01
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.01 
+            '--noise_level': 0.0001
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.01 
+            '--noise_level': 0.001
+        - options: 
+            '--mu': 0 
+            '--lmbda': 0.01 
+            '--noise_level': 0.01
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.001 
+            '--noise_level': 0.0001
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.001 
+            '--noise_level': 0.001
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.001 
+            '--noise_level': 0.01
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.002 
+            '--noise_level': 0.0001
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.002 
+            '--noise_level': 0.001
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.002 
+            '--noise_level': 0.01
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.01 
+            '--noise_level': 0.0001
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.01 
+            '--noise_level': 0.001
+        - options: 
+            '--mu': 1.0 
+            '--lmbda': 0.01 
+            '--noise_level': 0.01
