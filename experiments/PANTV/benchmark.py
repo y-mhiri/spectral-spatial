@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--tol", type=float, default=1e-12)
     parser.add_argument("--theta", type=float, default=1)
 
-    parser.add_argument("--image_idx", nargs="+", type=int, default=[6, 17])
+    parser.add_argument("--image_idx", nargs="*", type=int, default=[6, 17])
     parser.add_argument("--crop_center", action='store_true')
     parser.add_argument("--crop_size", type=int, default=256)
 
