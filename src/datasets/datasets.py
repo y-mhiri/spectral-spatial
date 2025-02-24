@@ -16,17 +16,17 @@ def get_eigenimages(hsi_data, return_eigenvalues=False):
     assert len(hsi_data.shape) == 4, "Input must be a 4D tensor of shape [batch, channels, height, width]"
 
     # Reshape HSI cubes to matrices of size [number of bands, number of pixels]
-    x_mat = hsi_data.reshape(hsi_data.shape[1], -1)
+    hsi_data_squeezed = hsi_data.reshape(hsi_data.shape[1], -1)
     # Singular Value Decomposition of noisy and true HSI
-    U, s, V = svd(x_mat, full_matrices=False)
+    U, evalue, V = svd(hsi_data_squeezed, full_matrices=False)
     # Eigenimages are the coefficient images of each HSI in the basis formed by its eigenvectors
-    Z_mat = torch.diag(s) @ V
-    Z = Z_mat.reshape(hsi_data.shape)
+    eimage_squeezed = torch.diag(evalue) @ V
+    eimage = eimage_squeezed.reshape(hsi_data.shape)
 
     if return_eigenvalues:
-        return Z, s
+        return eimage, evalue
     
-    return Z
+    return eimage
 
 class HSIDataset(data.Dataset):
 

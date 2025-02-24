@@ -29,7 +29,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--device", type=str, default="cpu")
-    parser.add_argument("--cuda_avail", type=bool, default=True)
+    parser.add_argument("--cuda_avail", action='store_true')
     parser.add_argument("--dtype", type=str, default="float32")
 
     parser.add_argument("--storage_path", type=str, required=True)
@@ -41,13 +41,13 @@ if __name__ == "__main__":
     parser.add_argument("--theta", type=float, default=1)
 
     parser.add_argument("--image_idx", nargs="+", type=int, default=[6, 17])
-    parser.add_argument("--crop_center", type=bool, default=True)
+    parser.add_argument("--crop_center", action='store_true')
     parser.add_argument("--crop_size", type=int, default=256)
 
     parser.add_argument("--noise_level",type=float, required=True)
     parser.add_argument("--lmbda", type=float, required=True)
     parser.add_argument("--mu", type=float, required=True)
-    parser.add_argument("--init", type=bool, default=False)
+    parser.add_argument("--true_init", action='store_true')
 
 
     args = parser.parse_args()
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     max_iter = args.max_iter
     tol = args.tol
     theta = args.theta
-    ground_truth_init = True if args.init else False
+    ground_truth_init = True if args.true_init else False
 
     ## lambda_tv and mu
     lmbda = args.lmbda
