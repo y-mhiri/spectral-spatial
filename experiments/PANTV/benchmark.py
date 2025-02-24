@@ -40,7 +40,8 @@ if __name__ == "__main__":
     parser.add_argument("--tol", type=float, default=1e-12)
     parser.add_argument("--theta", type=float, default=1)
 
-    parser.add_argument("--image_idx", nargs="*", type=int, default=[6, 17])
+    # parser.add_argument("--image_idx", nargs="*", type=int, default=[6, 17])
+    parser.add_argument("--image_idx", type=str, default='6, 17')
     parser.add_argument("--crop_center", action='store_true')
     parser.add_argument("--crop_size", type=int, default=256)
 
@@ -87,7 +88,7 @@ if __name__ == "__main__":
     algorithm = 'tv_plus_grad_alignement'
 
     # Choose subset of data
-    data_idx = args.image_idx # [6, 17]#  6,42,8,43]
+    data_idx = [int(x.strip()) for x in args.image_idx.split(',')] # [6, 17]#  6,42,8,43]
     crop = args.crop_center 
     crop_size = args.crop_size 
 
