@@ -55,8 +55,9 @@ def generate_figure(data,
         plt.savefig(os.path.join(folder, 'cost_function.png'))
         # tikzplotlib_fix_ncols(fig)
         # tikzplotlib.save(os.path.join(folder, 'cost_function.tex'))
-        # print('Saved plot in {}'.format(folder))
-
+        # print('Saved plot in {}'.format(folder)
+    else:
+        plt.show()
 
 if __name__ == "__main__":
 
@@ -65,6 +66,7 @@ if __name__ == "__main__":
                         default='data/',
                         help='Path to the data folder where '
                         'results.pkl is located.')  
+    parser.add_argument('--group', type=int)
     parser.add_argument('--save', action='store_true', default=True,
                         help='Save the plot as pdf and LaTeX code')
     args = parser.parse_args()
@@ -75,12 +77,19 @@ if __name__ == "__main__":
 
     folder = args.storage_path
 
+    if args.group:
+        folder = os.path.join(folder, f'group_{args.group}')
+
+    fig_folder = os.path.join(folder, 'figures')
+    if not os.path.exists(fig_folder):
+        os.makedirs(fig_folder)
+
     root = zarr.open(f'{folder}/results.zarr', mode='r')
 
     loss_ar = root['loss']
     # Plotting
     generate_figure(loss_ar,
-                    args.storage_path,
+                    fig_folder,
                     args.save)
 
     plt.show()

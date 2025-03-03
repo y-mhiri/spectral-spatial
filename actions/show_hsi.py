@@ -114,7 +114,7 @@ def visualize_hyperspectral_image(hsi_cube, name='image', eigen_indices=None, rg
             else:
                 print(f"Eigenindex {idx} is out of bounds for the number of bands {num_bands}.")
 
-    if not (show_eigenimage and eigen_indices and rgb_indices and band_indices):
+    if not (show_eigenimage or eigen_indices or rgb_indices or band_indices):
         print("To plot somethin, specify either 'rgb_indices', 'band_indices', 'eigen_indices', or set 'show_eigenimage' to True.")
 
 if __name__ == "__main__":
