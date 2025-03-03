@@ -29,7 +29,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--device", type=str, default="cpu")
-    parser.add_argument("--cuda_avail", action='store_true')
+    parser.add_argument("--no_cuda_avail", action='store_true')
     parser.add_argument("--dtype", type=str, default="float32")
 
     parser.add_argument("--storage_path", type=str, required=True)
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # parser.add_argument("--image_idx", nargs="*", type=int, default=[6, 17])
     parser.add_argument("--image_idx", type=str, default='6, 17')
-    parser.add_argument("--crop_center", action='store_true')
+    parser.add_argument("--no_crop", action='store_true')
     parser.add_argument("--crop_size", type=int, default=256)
 
     parser.add_argument("--noise_level",type=float, required=True)
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     # Define device (default is "cpu")
     device = args.device
-    cuda = "cuda" if args.cuda_avail else "cpu"
+    cuda = "cpu" if args.no_cuda_avail else "cuda"
 
 
     # Define dtype
@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     # Choose subset of data
     data_idx = [int(x.strip()) for x in args.image_idx.split(',')] # [6, 17]#  6,42,8,43]
-    crop = args.crop_center 
+    crop = not args.no_crop
     crop_size = args.crop_size 
 
     # Noise level
