@@ -21,7 +21,7 @@ class PANDataset(HSIDataset):
         super(PANDataset, self).__init__(root_dir, split='train', transform=None, normalize=False)
 
     def matrices():
-
+        modofi
         return H,B,S,R
 
     def blur(self, input_image, sigma=2):
