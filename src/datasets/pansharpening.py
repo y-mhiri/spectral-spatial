@@ -18,11 +18,11 @@ from HSIdatasets import HSIDataset
 
 class PANDataset(HSIDataset):
     def __init__(self, root_dir, split='train', transform=None, normalize=False):
-        super(PANDataset, self).__init__(root_dir, split='train', transform=None, normalize=False)
+        super(PANDataset, self).__init__(root_dir, split=split, transform=transform, normalize=normalize)
 
-    def matrices():
-        modofi
-        return H,B,S,R
+    def matrices(self):
+
+        return H, B, S, R
 
     def blur(self, input_image, sigma=2):
         """Applique un flou gaussien à l'image d'entrée."""
@@ -40,7 +40,7 @@ class PANDataset(HSIDataset):
             raise ValueError("L'image hyperspectrale doit être un tableau 3D.")
 
         # Initialiser un tableau pour stocker les résultats
-        h, w, c = hyperspectral_image.shape
+        h, w,c = hyperspectral_image.shape
         degraded_image = np.zeros((h // scale, w // scale, c))
 
         # Appliquer l'opérateur de dégradation à chaque bande
@@ -93,18 +93,16 @@ class PANDataset(HSIDataset):
             ndarray : Image suréchantillonnée.
         """
         # Vérifiez que l'image est en 3D
-        if hyperspectral_image.ndim != 3:
-            raise ValueError("L'image hyperspectrale doit être un tableau 3D.")
+        #if hyperspectral_image.ndim == 2:
+            # Ajouter une dimension pour les bandes
+            #hyperspectral_image = np.expand_dims(hyperspectral_image, axis=-1)
+        #elif hyperspectral_image.ndim != 3:
+            #raise ValueError("L'image hyperspectrale doit être un tableau 2D ou 3D.")
 
-        h, w, c = hyperspectral_image.shape
-        # Initialiser un tableau pour stocker les résultats
-        result_image = np.zeros((h * scale, w * scale, c))
+        h, w = hyperspectral_image.shape
+        result_image = np.zeros((h * scale, w * scale))
 
-        # Appliquer le suréchantillonnage à chaque bande
-        for i in range(c):
-            # Suréchantillonner la bande i
-            result_image[:, :, i] = np.zeros((h * scale, w * scale))
-            result_image[::scale, ::scale, i] = hyperspectral_image[:, :, i]
+        result_image[::scale, ::scale] = hyperspectral_image
 
         return result_image
 
@@ -125,7 +123,7 @@ class PANDataset(HSIDataset):
 
         # Initialiser un tableau pour stocker les résultats
         h, w, c = hyperspectral_image.shape
-        result_image = np.zeros((h, w, c))  # Dimensions de l'image d'origine
+        result_image = np.zeros((h * scale, w * scale, c))  # Dimensions de l'image d'origine
 
         # Appliquer l'opérateur adjoint à chaque bande
         for i in range(c):
@@ -135,3 +133,13 @@ class PANDataset(HSIDataset):
             result_image[:, :, i] = self.blur(result_image[:, :, i])  # Utilise la fonction blur déjà définie
 
         return result_image
+
+    def spectral(self):
+        h, w,c = self.height, self.width, self.nband
+        scalaire = 1/(h*w)
+        mat_R = torch.ones((1, c))
+        mat_R = scalaire * mat_R 
+
+        return  mat_R
+        
+
