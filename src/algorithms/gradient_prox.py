@@ -17,17 +17,38 @@ class ProximalGradient(nn.Module):
         self.tol = tol  # Tolérance pour la convergence
         self.verbose = verbose  # Affichage des informations
 
-    def grad_f(self, U, Y_H, Y_M,B, B_t, R):
+    def grad_f(self, U, Y_H, Y_M,B, R):
         """
         Calcule le gradient de la fonction f(U).
         """
         # Terme 1 : Gradient de 1/2 ||Y_H - H U B||_F^2
-        grad1 = (U @ B - Y_H) @ B_t
+        grad1 = (U @ B - Y_H) @ B.T # Si B est une matrice
+        # Si B est une fonction 
+        grad1 =  self.up_sample(self.blur(((self.blur(self.sub_sample(U))) - Y_H)))
 
         # Terme 2 : Gradient de (lambda_m / 2) ||Y_M - R H U||_F^2
         grad2 = self.lmbda_m * (R.T @ (R @ U - Y_M))
 
         return grad1 + grad2
+
+    def up_sample(X):
+        pass
+
+    def blur(self, img, sigma=2):
+        """ 
+        - img (C, H ,W)
+        - sigma (float)
+
+        Returns:
+        Blurred image of same size.
+
+        """
+        # Pytorch GaussianBlur sur chaque canal.
+        return 
+
+    def sub_sample(self, img, scale=8):
+        """Effectue un sous-échantillonnage de l'image."""
+        return img[:, ::scale, ::scale]
 
     def norm_221(self, A):
         """

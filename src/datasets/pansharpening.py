@@ -22,7 +22,15 @@ class PANDataset(HSIDataset):
 
     def matrices(self):
 
-        return H, B, S, R
+        h, w,c = self.height, self.width, self.nband
+        scalaire = 1/(h*w)
+        mat_R = torch.ones((1, c))
+        mat_R = scalaire * mat_R 
+    
+        mat_B = 
+        
+        mat_H = torch.eye(...)
+        return mat_H, mat_B, mat_R
 
     def blur(self, input_image, sigma=2):
         """Applique un flou gaussien à l'image d'entrée."""
@@ -31,7 +39,7 @@ class PANDataset(HSIDataset):
 
     def sub_sample(self, img, scale):
         """Effectue un sous-échantillonnage de l'image."""
-        return img[::scale, ::scale]
+        return img[:, ::scale, ::scale]
 
     def process_hyperspectral_image(self, hyperspectral_image, scale):
         """Applique l'opérateur de dégradation à chaque bande d'une image hyperspectrale."""
