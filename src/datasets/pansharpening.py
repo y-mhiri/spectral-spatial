@@ -17,104 +17,111 @@ from HSIdatasets import HSIDataset
 
 
 class PANDataset(HSIDataset):
-    def __init__(self, root_dir, split='train', transform=None, normalize=False):
-        super(PANDataset, self).__init__(root_dir, split=split, transform=transform, normalize=normalize)
+    """
 
-    def matrices(self):
+    Cette classe permet de recuperer les données et de simuler les images hyperspectral base résolution,
+    l'image panchromatic et les opérateur flou et sous échantillonnage et suréchantillonnage 
 
-        h, w,c = self.height, self.width, self.nband
-        scalaire = 1/(h*w)
-        mat_R = torch.ones((1, c))
-        mat_R = scalaire * mat_R 
+    ...
+
+    Attributes
+    ----------
+    split: data
+    rgb_index : vecteur
+    wavenumbers : entier
+    spatial_resolution : entier
+    spectral_resolution : entier
+    nband : entier
+    height : entier
+    width : entier
     
-        mat_B = 
+
+
+    Methods
+    -------
+    blurr(image,sigma)
+    cette fonction applique un flou gaussien à image avec un niveau de bruit de bruit sigma
+    sub_sample(image ,scale)
+    cette fonction applique un sous échantillonnage à l'image avec un facteur scale 
+    up_sample(image,scale)
+    cette fonction applique un suréchantillonnage à l'image avec un facteur scale 
+    simule_low_hsi(image,scale)
+    cette fonction applique un flou gaussien à image suivi d'une sous échantillonage avec un facteur scale a fin d'avoir 
+    l'image hyperspectral de base résolution 
+    simule_low_hsi_adjoint(image,scale)
+    cette fontion applique une suréchantillonnage suivi d'un flou gaussien a fin de récupérer l'image l'opérateur adjoint
+    get_panchromatique(image)
+    cette fonction récupére l'image panchromtique en faisant une moyenne de image selon les bandes 
+    """ 
+    def __init__(self, root_dir, split='train', transform=None, normalize=False, scale =8,sigma=2):
+        super(PANDataset, self).__init__(root_dir, split=split, transform=transform, normalize=normalize)
         
-        mat_H = torch.eye(...)
-        return mat_H, mat_B, mat_R
 
-    def blur(self, input_image, sigma=2):
+        self.split = split
+        self.scale = scale
+        self.sigma = sigma 
+        self.rgb_index = self.file.attrs['rgb']
+        self.wavenumbers = self.file.attrs['spectral_range']
+        self.spatial_resolution = self.file.attrs['spatial_resolution (m)']
+        self.spectral_resolution = self.file.attrs['spectral_resolution (nm)']
+        self.nband = self.file[self.split][0][:].shape[2]
+        self.height = self.file[self.split][0][:].shape[0]
+        self.width = self.file[self.split][0][:].shape[1]
+
+
+
+    def blur(self, input_image):
         """Applique un flou gaussien à l'image d'entrée."""
-        output = gaussian_filter(input=input_image, sigma=sigma, mode='mirror')
-        return output
 
-    def sub_sample(self, img, scale):
+
+        h, w, c = input_image.shape
+        blurred = np.zeros((h, w, c))
+        for i in range(c):
+            # Appliquer le flou
+            blurred[:,:,i] = gaussian_filter(input=input_image[:, :, i], sigma=self.sigma, mode='mirror')
+        return blurred
+    
+    def sub_sample(self, input_image):
         """Effectue un sous-échantillonnage de l'image."""
-        return img[:, ::scale, ::scale]
+        return input_image[:, ::self.scale, ::self.scale]
+    
 
-    def process_hyperspectral_image(self, hyperspectral_image, scale):
-        """Applique l'opérateur de dégradation à chaque bande d'une image hyperspectrale."""
+    def S_up(self, input_image):
+        
+        h, w,c = input_image.shape
+        result_image = np.zeros((h * self.scale, w * self.scale,c))
+
+        result_image[:,::self.scale, ::self.scale] = input_image[:,:,:]
+
+        return result_image
+    
+
+    def simule_low_hsi(self, input_image):
+        """Applique l'opérateur de dégradation  d'une image hyperspectrale."""
         # Vérifiez que l'image est en 3D
-        if hyperspectral_image.ndim != 3:
+        if input_image.ndim != 3:
             raise ValueError("L'image hyperspectrale doit être un tableau 3D.")
 
         # Initialiser un tableau pour stocker les résultats
-        h, w,c = hyperspectral_image.shape
-        degraded_image = np.zeros((h // scale, w // scale, c))
+        h, w,c = input_image
+        degraded_image = np.zeros((h // self.scale, w // self.scale, c))
 
         # Appliquer l'opérateur de dégradation à chaque bande
-        for i in range(c):
-            # Appliquer le flou
-            blurred_band = self.blur(hyperspectral_image[:, :, i])
-            print(f"Forme après flou (bande {i}): {blurred_band.shape}")
+
+        blurred = self.blur(input_image)
 
             # Sous-échantillonnage
-            degraded_band = self.sub_sample(blurred_band, scale)
-            print(f"Forme après sous-échantillonnage (bande {i}): {degraded_band.shape}")
-
-            # Vérifiez que les dimensions sont correctes
-            if degraded_band.shape != (h // scale, w // scale):
-                raise ValueError(f"Erreur de dimension pour la bande {i}: attendue {(h // scale, w // scale)}, obtenue {degraded_band.shape}")
-
-            # Assignation à l'image dégradée
-            degraded_image[:, :, i] = degraded_band
+        degraded_image = self.sub_sample(blurred, self.scale)
 
         return degraded_image
-
-    def simulate_panchromatic(self, index):
-        """
-        Simule une image panchromatique à partir de l'image hyperspectrale.
-
-        Paramètres :
-        - index : Indice de l'image dans le dataset.
-
-        Retour :
-        - Y_M : Image panchromatique de forme (hauteur, largeur).
-        """
-        # Charger l'image hyperspectrale originale
+    
+    def get_panchromatic(self, index):
         hsi_data = self.file[self.split][index][:]
-        hsi_data = torch.tensor(hsi_data, dtype=torch.float32)
+        panchromatic = hsi_data.mean(axis=-1)
+        return panchromatic
+    
 
-        # Calculer la moyenne sur les bandes spectrales
-        Y_M = hsi_data.mean(dim=-1)
-
-        return Y_M
-
-    def S_up(self, hyperspectral_image, scale):
-        """
-        Effectue un suréchantillonnage d'une image hyperspectrale canal par canal.
-
-        Args:
-            hyperspectral_image (ndarray) : Image hyperspectrale d'entrée à suréchantillonner.
-            scale (int) : Facteur d'échantillonnage.
-
-        Retourne:
-            ndarray : Image suréchantillonnée.
-        """
-        # Vérifiez que l'image est en 3D
-        #if hyperspectral_image.ndim == 2:
-            # Ajouter une dimension pour les bandes
-            #hyperspectral_image = np.expand_dims(hyperspectral_image, axis=-1)
-        #elif hyperspectral_image.ndim != 3:
-            #raise ValueError("L'image hyperspectrale doit être un tableau 2D ou 3D.")
-
-        h, w = hyperspectral_image.shape
-        result_image = np.zeros((h * scale, w * scale))
-
-        result_image[::scale, ::scale] = hyperspectral_image
-
-        return result_image
-
-    def process_hyperspectral_image_adjoint(self, hyperspectral_image, scale):
+    def simule_low_hsi_adjoint(self, input_image):
         """
         Applique l'opérateur de dégradation SB adjoint à chaque bande d'une image hyperspectrale.
 
@@ -126,28 +133,18 @@ class PANDataset(HSIDataset):
             ndarray : Image transformée.
         """
         # Vérifiez que l'image est en 3D
-        if hyperspectral_image.ndim != 3:
+        if input_image != 3:
             raise ValueError("L'image hyperspectrale doit être un tableau 3D.")
 
         # Initialiser un tableau pour stocker les résultats
-        h, w, c = hyperspectral_image.shape
-        result_image = np.zeros((h * scale, w * scale, c))  # Dimensions de l'image d'origine
+        h, w, c = input_image.shape
+        result_image = np.zeros((h * self.scale, w * self.scale, c))  # Dimensions de l'image d'origine
 
-        # Appliquer l'opérateur adjoint à chaque bande
-        for i in range(c):
             # Suréchantillonner la bande
-            result_image[:, :, i] = self.S_up(hyperspectral_image[:, :, i], scale)
+        result_image[:, :, :] = self.S_up(input_image, self.scale)
             # Appliquer le flou gaussien
-            result_image[:, :, i] = self.blur(result_image[:, :, i])  # Utilise la fonction blur déjà définie
+        result_image[:, :, :] = self.blur(input_image,self.sigma)  # Utilise la fonction blur déjà définie
 
         return result_image
 
-    def spectral(self):
-        h, w,c = self.height, self.width, self.nband
-        scalaire = 1/(h*w)
-        mat_R = torch.ones((1, c))
-        mat_R = scalaire * mat_R 
-
-        return  mat_R
-        
 
