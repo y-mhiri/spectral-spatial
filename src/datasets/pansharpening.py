@@ -34,11 +34,14 @@ class PANDataset(HSIDataset):
     nband : entier
     height : entier
     width : entier
+    sigma : entier
+    scale : entier
+
     
 
 
     Methods
-    -------
+    ---
     blurr(image,sigma)
     cette fonction applique un flou gaussien à image avec un niveau de bruit de bruit sigma
     sub_sample(image ,scale)
@@ -71,25 +74,25 @@ class PANDataset(HSIDataset):
 
 
     def blur(self, input_image):
-        """Applique un flou gaussien à l'image d'entrée."""
+        """Applique un flou gaussien à l'image d'entrée (torch.tensor) [h, w,c]."""
 
 
         h, w, c = input_image.shape
-        blurred = np.zeros((h, w, c))
+        blurred = torch.zeros((h, w, c))
         for i in range(c):
             # Appliquer le flou
             blurred[:,:,i] = gaussian_filter(input=input_image[:, :, i], sigma=self.sigma, mode='mirror')
         return blurred
     
     def sub_sample(self, input_image):
-        """Effectue un sous-échantillonnage de l'image."""
+        """Effectue un sous-échantillonnage de l'image (torch.tensor) [h,w,c]."""
         return input_image[:, ::self.scale, ::self.scale]
     
 
     def S_up(self, input_image):
-        
+        """Effectue un sur-échantillonnage de l'image (torch.tensor) [h //self.scale, w //self.scale,c]"""
         h, w,c = input_image.shape
-        result_image = np.zeros((h * self.scale, w * self.scale,c))
+        result_image = np.zeros((h * self.scale, w * self.scale,c))(h * self.scale, w * self.scale, c)
 
         result_image[:,::self.scale, ::self.scale] = input_image[:,:,:]
 
@@ -97,13 +100,13 @@ class PANDataset(HSIDataset):
     
 
     def simule_low_hsi(self, input_image):
-        """Applique l'opérateur de dégradation  d'une image hyperspectrale."""
+        """Applique l'opérateur de dégradation de l'image d'entrée (torch.tensor) [h,w,c] ."""
         # Vérifiez que l'image est en 3D
         if input_image.ndim != 3:
             raise ValueError("L'image hyperspectrale doit être un tableau 3D.")
 
         # Initialiser un tableau pour stocker les résultats
-        h, w,c = input_image
+        h, w,c = input_image.shape
         degraded_image = np.zeros((h // self.scale, w // self.scale, c))
 
         # Appliquer l'opérateur de dégradation à chaque bande
@@ -116,6 +119,9 @@ class PANDataset(HSIDataset):
         return degraded_image
     
     def get_panchromatic(self, index):
+        """
+        index (entier) 
+        """
         hsi_data = self.file[self.split][index][:]
         panchromatic = hsi_data.mean(axis=-1)
         return panchromatic
@@ -123,14 +129,7 @@ class PANDataset(HSIDataset):
 
     def simule_low_hsi_adjoint(self, input_image):
         """
-        Applique l'opérateur de dégradation SB adjoint à chaque bande d'une image hyperspectrale.
-
-        Args:
-            hyperspectral_image (ndarray) : Image hyperspectrale d'entrée.
-            scale (int) : Facteur d'échantillonnage.
-
-        Retourne:
-            ndarray : Image transformée.
+        Applique l'opérateur de dégradation SB adjoint  de l'image hyperspectrale (torch.tensor) [(h//scale,w//scale,c)].
         """
         # Vérifiez que l'image est en 3D
         if input_image != 3:
