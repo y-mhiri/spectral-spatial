@@ -14,11 +14,11 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 from torchvision.transforms.functional import gaussian_blur
 from HSIdatasets import HSIDataset
+import torchvision.transforms as transforms
 
 
 class PANDataset(HSIDataset):
     """
-
     Cette classe permet de recuperer les données et de simuler les images hyperspectral base résolution,
     l'image panchromatic et les opérateur flou et sous échantillonnage et suréchantillonnage 
 
@@ -37,28 +37,24 @@ class PANDataset(HSIDataset):
     sigma : entier
     scale : entier
 
-    
-
-
     Methods
     ---
     blurr(image,sigma)
-    cette fonction applique un flou gaussien à image avec un niveau de bruit de bruit sigma
+        cette fonction applique un flou gaussien à image avec un niveau de bruit de bruit sigma
     sub_sample(image ,scale)
-    cette fonction applique un sous échantillonnage à l'image avec un facteur scale 
+        cette fonction applique un sous échantillonnage à l'image avec un facteur scale 
     up_sample(image,scale)
-    cette fonction applique un suréchantillonnage à l'image avec un facteur scale 
+        cette fonction applique un suréchantillonnage à l'image avec un facteur scale 
     simule_low_hsi(image,scale)
-    cette fonction applique un flou gaussien à image suivi d'une sous échantillonage avec un facteur scale a fin d'avoir 
-    l'image hyperspectral de base résolution 
+        cette fonction applique un flou gaussien à image suivi d'une sous échantillonage avec un facteur scale a fin d'avoir 
+        l'image hyperspectral de base résolution 
     simule_low_hsi_adjoint(image,scale)
-    cette fontion applique une suréchantillonnage suivi d'un flou gaussien a fin de récupérer l'image l'opérateur adjoint
+        cette fontion applique une suréchantillonnage suivi d'un flou gaussien a fin de récupérer l'image l'opérateur adjoint
     get_panchromatique(image)
-    cette fonction récupére l'image panchromtique en faisant une moyenne de image selon les bandes 
+        cette fonction récupére l'image panchromtique en faisant une moyenne de image selon les bandes 
     """ 
-    def __init__(self, root_dir, split='train', transform=None, normalize=False, scale =8,sigma=2):
+    def __init__(self, root_dir, split='train', transform=None, normalize=False, scale=8, sigma=2):
         super(PANDataset, self).__init__(root_dir, split=split, transform=transform, normalize=normalize)
-        
 
         self.split = split
         self.scale = scale
@@ -71,79 +67,123 @@ class PANDataset(HSIDataset):
         self.height = self.file[self.split][0][:].shape[0]
         self.width = self.file[self.split][0][:].shape[1]
 
-
-
     def blur(self, input_image):
-        """Applique un flou gaussien à l'image d'entrée (torch.tensor) [h, w,c]."""
+        """Applique un flou gaussien à l'image d'entrée.
+    
+        Parameters:
+            input_image (torch.tensor) : l'image hyperspectrale originale de taille [h,w,c]
 
+        Returns:
+            blurred (torch.tensor) : l'image floutée de taille [h,w,c]
+        """
+        # Appliquer le flou gaussien sur l'image entière
+        gaussian_blur = transforms.GaussianBlur(kernel_size=(5, 5), sigma=self.sigma)
 
-        h, w, c = input_image.shape
-        blurred = torch.zeros((h, w, c))
-        for i in range(c):
-            # Appliquer le flou
-            blurred[:,:,i] = gaussian_filter(input=input_image[:, :, i], sigma=self.sigma, mode='mirror')
+        # Assurez-vous que l'image est dans le format [c, h, w] pour les transformations de torchvision
+        input_image = input_image.permute(2, 0, 1)  # Changer de [h, w, c] à [c, h, w]
+
+        # Appliquer le flou
+        blurred = gaussian_blur(input_image)
+
+        # Reconvertir l'image au format [h, w, c]
+        blurred = blurred.permute(1, 2, 0)  # Changer de [c, h, w] à [h, w, c]
+
         return blurred
     
     def sub_sample(self, input_image):
-        """Effectue un sous-échantillonnage de l'image (torch.tensor) [h,w,c]."""
-        return input_image[:, ::self.scale, ::self.scale]
+        """Effectue un sous-échantillonnage de l'image (torch.tensor)
+        
+        Parameters : 
+            input_image (torch.tensor) : l'image hyperspectrale floutée de taille [h,w,c]
+
+        Returns : 
+            input_image (torch.tensor) : l'image hyperspectrale floutée et sous-échantillonnée de taille [h//self.scale, w//self.scale,c]
+        """
+        return input_image[::self.scale, ::self.scale,:]
     
-
     def S_up(self, input_image):
-        """Effectue un sur-échantillonnage de l'image (torch.tensor) [h //self.scale, w //self.scale,c]"""
-        h, w,c = input_image.shape
-        result_image = np.zeros((h * self.scale, w * self.scale,c))(h * self.scale, w * self.scale, c)
+        """Effectue un sur-échantillonnage de l'image d'entrée 
 
-        result_image[:,::self.scale, ::self.scale] = input_image[:,:,:]
+        Parameters : 
+            input_image (torch.tensor) : l'image sous échantillonnée de taille [h //self.scale, w //self.scale,c]
+
+        Returns : 
+            result_image (torch.tensor) : l'image sur-échantillonnée de taille [h*self.scale, w*self.scale,c] 
+        """
+        h, w, c = input_image.shape
+        result_image = torch.zeros((h * self.scale, w * self.scale, c))
+
+        result_image[::self.scale, ::self.scale,:] = input_image[:, :, :]
 
         return result_image
     
-
     def simule_low_hsi(self, input_image):
-        """Applique l'opérateur de dégradation de l'image d'entrée (torch.tensor) [h,w,c] ."""
+        """Applique l'opérateur de dégradation flou et sous-échantillonnage de l'image d'entrée [h,w,c] 
+
+        Parameters : 
+            input_image (torch.tensor) : l'image hyperspectrale originale de taille [h,w,c] 
+
+        Returns :
+            degraded_image (torch.tensor) : l'image sous-échantillonnée et floutée de taille [h // self.scale, w // self.scale, c].
+        """
         # Vérifiez que l'image est en 3D
         if input_image.ndim != 3:
             raise ValueError("L'image hyperspectrale doit être un tableau 3D.")
 
-        # Initialiser un tableau pour stocker les résultats
-        h, w,c = input_image.shape
-        degraded_image = np.zeros((h // self.scale, w // self.scale, c))
-
         # Appliquer l'opérateur de dégradation à chaque bande
-
         blurred = self.blur(input_image)
 
-            # Sous-échantillonnage
-        degraded_image = self.sub_sample(blurred, self.scale)
+        # Sous-échantillonnage
+        degraded_image = self.sub_sample(blurred)
 
         return degraded_image
     
     def get_panchromatic(self, index):
-        """
-        index (entier) 
+        """Fais une moyenne des pixels le long des canaux
+
+        Parameters :
+            index (int) : l'index de l'image de taille [h,w,c] qu'on veut récupérer
+
+        Returns :
+            panchromatic (torch.tensor) : l'image obtenue en faisant la moyenne par canal des pixels de taille [h,w,1]
         """
         hsi_data = self.file[self.split][index][:]
         panchromatic = hsi_data.mean(axis=-1)
         return panchromatic
     
-
     def simule_low_hsi_adjoint(self, input_image):
-        """
-        Applique l'opérateur de dégradation SB adjoint  de l'image hyperspectrale (torch.tensor) [(h//scale,w//scale,c)].
+        """Applique l'opérateur de dégradation adjoint à l'image hyperspectrale 
+
+        Parameters :
+            input_image (torch.tensor) : l'image floutée et sous-échantillonnée de taille [h//scale,w//scale,c].
+
+        Returns : 
+            result_image (torch.tensor) : l'image sur-échantillonnée et défloutée de taille [h,w,c]
         """
         # Vérifiez que l'image est en 3D
-        if input_image != 3:
+        if input_image.ndim != 3:
             raise ValueError("L'image hyperspectrale doit être un tableau 3D.")
 
-        # Initialiser un tableau pour stocker les résultats
-        h, w, c = input_image.shape
-        result_image = np.zeros((h * self.scale, w * self.scale, c))  # Dimensions de l'image d'origine
+        # Suréchantillonner l'image
+        result_image = self.S_up(input_image)
 
-            # Suréchantillonner la bande
-        result_image[:, :, :] = self.S_up(input_image, self.scale)
-            # Appliquer le flou gaussien
-        result_image[:, :, :] = self.blur(input_image,self.sigma)  # Utilise la fonction blur déjà définie
+        # Appliquer le flou gaussien
+        result_image = self.blur(result_image)
 
         return result_image
+    
+    def spectral(self):
+        h, w,c = self.height, self.width, self.nband
+        scalaire = 1/(h*w)
+        mat_R = torch.ones((1, c))
+        mat_R = scalaire * mat_R 
 
+        return  mat_R
+    
+    def spectral_trans(self):
+        h, w,c = self.height, self.width, self.nband
+        scalaire = 1/(h*w)
+        mat_R = torch.ones((1, c))
+        mat_R = scalaire * mat_R 
 
+        return  mat_R.t()
