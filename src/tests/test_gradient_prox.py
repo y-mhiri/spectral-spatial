@@ -1,6 +1,6 @@
 import sys
-sys.path.append('../datasets')
-sys.path.append('../algorithms')
+sys.path.append('src/datasets')
+sys.path.append('src/algorithms')
 
 
 import torch
@@ -8,7 +8,7 @@ import torch
 import matplotlib.pyplot as plt
 
 from pansharpening import PANDataset
-from gradient_prox import GradientProximal
+from gradient_prox_1 import ProximalGradient
 from torchvision import transforms
 from math import sqrt
 
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
 
     # Define data path
-    data_path = '/home/mhiriy/data/harvard.zarr'
+    data_path = '/home/ndiayem/Documents/spectral-spatial/data/harvard.zarr'
 
 
     #val_transform = transforms.Compose([transforms.ToTensor()]) # Transforms a the input data to torch tensors
@@ -35,16 +35,15 @@ if __name__ == '__main__':
 
     idx = 17
     X = torch.tensor(dataset[idx])
-    X = X.unsqueeze(0).to(device=device, dtype=dtype)
 
     # Matrice de transformation
-    Y_H = dataset.process_hyperspectral_image(X,8)  
-    Y_M = dataset.get_panchromatic(X)                                                             # Transposée de B
-    H, B, R = dataset.matrices() 
+    Y_H = dataset.simule_low_hsi(X)  
+    Y_M = dataset.get_panchromatic(idx)
+    Y_M = torch.tensor(Y_M)                                                             # Transposée de B 
     
 
-
-    pansharpening_model = ProximalGradient(max_iter=100, lmbda=0.1, lmbda_m=1, tau=0.1, verbose=True)
+    
+    pansharpening_model = ProximalGradient(dataset.simule_low_hsi,dataset.simule_low_hsi_adjoint , dataset.spectral,dataset.spectral_trans,max_iter=100, lmbda=0.1, lmbda_m=1, tau=0.1,tol=1e-7 ,scale = 8,verbose=True)
 
     # Exécution de l'optimisation
-    U_result = pansharpening_model.forward(Y_H, Y_M, B, B_t, R)
+    U_result = pansharpening_model.forward(Y_H, Y_M)
