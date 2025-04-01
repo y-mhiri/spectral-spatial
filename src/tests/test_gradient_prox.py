@@ -43,10 +43,15 @@ if __name__ == '__main__':
     Y_M = Y_M                                                             # Transposée de B 
     
 
+    params = {
+        'max_iter_cb' : 1000
+        'theta_cb' : 1
+        ...
+    }
     
-    pansharpening_model = ProximalGradient(dataset.simule_low_hsi,dataset.simule_low_hsi_adjoint ,max_iter=100, lmbda=0.1, lmbda_m=1, tau=0.1,tol=1e-7 ,scale = 8,verbose=True)
+    pansharpening_model = ProximalGradient(dataset.simule_low_hsi,dataset.simule_low_hsi_adjoint ,max_iter=100, lmbda=0.1, lmbda_m=1, tau=0.1,tol=1e-7 ,scale = 8,verbose=True, **param_cb)
 
     # Exécution de l'optimisation
-    U_result = pansharpening_model.forward(Y_H, Y_M)
+    U_result = pansharpening_model(Y_H, Y_M)
 
     print('OK.')
