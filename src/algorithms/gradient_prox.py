@@ -1,140 +1,195 @@
+import sys
+sys.path.append('src/datasets')
+sys.path.append('src/algorithms')
+
 import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
-from grad import gradient, div_3d
+from nabla import nabla, nabla_adjoint
+from pansharpening import PANDataset
 
 class ProximalGradient(nn.Module):
     """
     Algorithme de gradient proximal pour résoudre le problème de pansharpening hyperspectral.
+    se que l'image de sortie sera blanche aussi
+    Attributs:
+        max_iter (int): Nombre maximal d'itérations
+        lmbda (float): Paramètre de régularisation pour la variation totale
+        lmbda_m (float): Paramètre de régularisation pour l'attache aux données multispectrales
+        tau (float): Pas de descente
+        tol (float): Critère de convergence
+        A (function): Opérateur de sous-échantillonnage plus flou gaussien
+        Aadj (function): Opérateur adjoint de A
+        scale (int): Facteur d'échelle
+        verbose (bool): Affichage des informations
     """
 
-    def __init__(self, max_iter=100, lmbda=1.0, lmbda_m=1.0, tau=0.1, tol=1e-7, verbose=True):
+    def __init__(self, A, Aadj, max_iter, lmbda, lmbda_m, tau, tol, scale, verbose):
         super(ProximalGradient, self).__init__()
         self.max_iter = max_iter
-        self.lmbda = lmbda  # Paramètre de régularisation pour la variation totale
-        self.lmbda_m = lmbda_m  # Paramètre de régularisation pour l'attache aux données multispectrales
-        self.tau = tau  # Pas de gradient
-        self.tol = tol  # Tolérance pour la convergence
-        self.verbose = verbose  # Affichage des informations
+        self.scale = scale
+        self.lmbda = lmbda
+        self.lmbda_m = lmbda_m
+        self.tau = tau
+        self.tol = tol
+        self.verbose = verbose
+        self.A = A
+        self.Aadj = Aadj
 
-    def grad_f(self, U, Y_H, Y_M,B, R):
+    def convergence_criteria(self, U0, U1):
+        """
+        Critère de convergence comparant la norme avec la valeur de tolérance.
+        
+        Args:
+            U1 (torch.Tensor): Image estimée à l'itération i [b,c,h,w]
+            U0 (torch.Tensor): Image estimée à l'itération i-1 [b,c,h,w]
+            
+        Returns:
+            bool: True si la condition est vérifiée, False sinon
+        """
+        return (torch.linalg.norm(U1-U0)/torch.linalg.norm(U0)) < self.tol
+    
+    def grad_f(self, U, Y_H, Y_M):
         """
         Calcule le gradient de la fonction f(U).
+        
+        Args:
+            U (torch.Tensor): Image hyperspectrale estimée [b,c,h,w]
+            Y_H (torch.Tensor): Image hyperspectrale basse résolution [b,c,h//scale,w//scale]
+            Y_M (torch.Tensor): Image panchromatique [b,1,h,w]
+            
+        Returns:
+            torch.Tensor: Gradient combiné [h,w,c]
         """
-        # Terme 1 : Gradient de 1/2 ||Y_H - H U B||_F^2
-        grad1 = (U @ B - Y_H) @ B.T # Si B est une matrice
-        # Si B est une fonction 
-        grad1 =  self.up_sample(self.blur(((self.blur(self.sub_sample(U))) - Y_H)))
+        R = PANDataset.spectral(U)
+        #R_T = R.t()
+        
+        # Terme 1: Gradient de 1/2 ||Y_H - A(U)||_F^2
+        grad1 = self.Aadj((self.A(U) - Y_H))
 
-        # Terme 2 : Gradient de (lambda_m / 2) ||Y_M - R H U||_F^2
-        grad2 = self.lmbda_m * (R.T @ (R @ U - Y_M))
+        # Terme 2: Gradient de (lambda_m/2) ||Y_M - R H U||_F^2
+        #U_flat = U.view(1, 31, -1)
+        #RU = torch.matmul(R, U_flat.squeeze(0)).unsqueeze(0) 
+        #RU_reshaped = RU.view(1, 1, 1040, 1392)
+        #subtracted = RU_reshaped - Y_M
+        #subtracted_flat = subtracted.view(1, 1, -1).float()
+        #grad2_flat = torch.matmul(R_T, subtracted_flat)
+        #grad2 = self.lmbda_m * grad2_flat.view(1, 31, 1040, 1392)
+        #R = PANDataset.spectral(U)  # [1, C]
+        residual_pan = torch.einsum('ij,jklm->iklm', R, U) - Y_M  # [1,1,h,w]
+        grad2 = self.lmbda_m * torch.einsum('ij,jklm->iklm', R.T, residual_pan)
 
         return grad1 + grad2
-
-    def up_sample(X):
-        pass
-
-    def blur(self, img, sigma=2):
-        """ 
-        - img (C, H ,W)
-        - sigma (float)
-
-        Returns:
-        Blurred image of same size.
-
-        """
-        # Pytorch GaussianBlur sur chaque canal.
-        return 
-
-    def sub_sample(self, img, scale=8):
-        """Effectue un sous-échantillonnage de l'image."""
-        return img[:, ::scale, ::scale]
-
-    def norm_221(self, A):
-        """
-        Calcule la norme collaborative L2,2,1 d'un tenseur A.
-        A : Tensor de forme (2, N, M, C).
-        """
-        # Étape 1 : Calculer la somme des carrés sur les bandes spectrales (dim=3)
-        sum_squares = torch.sum(A**2, dim=3)  # Forme (2, N, M)
-
-        # Étape 2 : Somme sur la largeur (dim=2)
-        sum_width = torch.sum(sum_squares, dim=2)  # Forme (2, N)
-
-        # Étape 3 : Prendre la racine carrée
-        sqrt_sum = torch.sqrt(sum_width)  # Forme (2, N)
-
-        # Étape 4 : Somme sur la hauteur (dim=1)
-        norm_height = torch.sum(sqrt_sum, dim=1)  # Forme (2,)
-
-        return norm_height
-
+    
     def proj(self, z):
         """
-        Projette les valeurs de z sur la boule unité en utilisant la norme L2,2,1.
-        z : Tensor de forme (2, hauteur, largeur, bandes)
+        Projection sur la boule unité pour la norme l221.
+        
+        Args:
+            z (torch.Tensor): Tenseur [b,c,h,w,2]
+            
+        Returns:
+            torch.Tensor: Image projetée [b,c,h,w,2]
         """
-        # Calcul de la norme L2,2,1 pour z
-        norm = self.norm_221(z)
-
-        # Appliquer la projection uniquement si la norme L2,2,1 > 1
-        mask = norm > 1
-        z_proj = torch.where(mask.unsqueeze(1).unsqueeze(2).unsqueeze(3), 
-                             z / norm.unsqueeze(1).unsqueeze(2).unsqueeze(3), z)
-
-        return z_proj
-
-    def grad_proj(self, x, tau, max_iter):
+        return z / torch.maximum(torch.norm(z, dim=-1, keepdim=True), torch.ones_like(z))
+    
+    def grad_proj(self, x):
         """
-        Calcule le gradient de la projection.
-        x : Tensor de forme (hauteur, largeur, bandes)
-        tau : Pas de gradient
-        max_iter : Nombre maximal d'itérations
+        Descente de gradient projeté.
+        
+        Args:
+            x (torch.Tensor): Tenseur [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Minimum [b,c,h,w]
         """
-        n, m, c = x.shape
-        z0 = torch.ones((2, n, m, c), device=x.device)  # Initialisation de z0
-
-        for _ in range(max_iter):
-            # Calcul du gradient de la divergence
-            div_z0 = div_3d(z0)  # Divergence de z0
-            grad_z = -2 * gradient(div_z0 + x / self.lmbda)  # Gradient de la fonction
-
-            # Mise à jour de z
-            z = self.proj(z0 - tau * grad_z)
+        b, c, h, w = x.shape
+        z0 = torch.ones((b, c, h, w, 2))
+        
+        for i in range(self.max_iter):
+            grad_z = -2 * nabla(nabla_adjoint(z0) + x / self.lmbda)
+            z = self.proj(z0 - self.tau * grad_z)
+            
+            if self.convergence_criteria(z, z0):
+                break
+                
             z0 = z
-
+            
         return z
-
-    def proxg(self, x, tau, max_iter):
+    
+    def proxg(self, x):
         """
-        Calcule le proximal.
-        x : Tensor de forme (hauteur, largeur, bandes)
-        tau : Pas de gradient
-        max_iter : Nombre maximal d'itérations
+        Opérateur proximal de x.
+        
+        Args:
+            x (torch.Tensor): Tenseur [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Image projetée [b,c,h,w]
         """
-        z = self.grad_proj(x, tau, max_iter)
-        y = x + self.lmbda * div_3d(z)
-        return y
-    def forward(self, Y_H, Y_M, B, B_t, R, U_init=None):
+        z = torch.clone(x)
+        z = self.grad_proj(z)
+        return x + self.lmbda * nabla_adjoint(z)
+    
+    def forward(self, Y_H, Y_M):
         """
         Résout le problème d'optimisation.
+        
+        Args:
+            Y_H (torch.Tensor): Image hyperspectrale basse résolution [b,c,h//scale,w//scale]
+            Y_M (torch.Tensor): Image panchromatique [b,1,h,w]
+            
+        Returns:
+            torch.Tensor: Image estimée [b,c,h,w]
         """
         # Initialisation
-        if U_init is None:
-            U = torch.zeros_like(Y_H)
-        else:
-            U = torch.clone(U_init)
+        #Y_H = (Y_H - Y_H.min()) / (Y_H.max() - Y_H.min())
+        #Y_M = (Y_M - Y_M.min()) / (Y_M.max() - Y_M.min())
+        #_, _, h, w = Y_M.shape
+        #b, c, _, _ = Y_H.shape
+        #U = torch.zeros((b, c, h, w))
+        U = self.Aadj(Y_H).clone()
 
-        # Boucle d'optimisation
-        for it in tqdm(range(self.max_iter)):
+        
+        for it in tqdm(range(self.max_iter), disable=not self.verbose):
             # Gradient de f(U)
-            grad_U = self.grad_f(U, Y_H, Y_M, B, B_t, R)
-
+            grad_U = self.grad_f(U, Y_H, Y_M)
+            
             # Mise à jour de U
-            U = self.proxg(U - self.lmbda * grad_U, self.tau, self.max_iter)
-
-            # Affichage des informations
-            if self.verbose and (it % 10 == 0):
-                print(f'Iteration {it}: Loss = {torch.norm(Y_H - U @ B)}')
-
+            U_new = self.proxg(U - self.lmbda * grad_U)
+            
+            # Calcul des termes du coût
+            # 1. Terme d'attache aux données hyperspectrales
+            data_term_h = 0.5 * torch.norm(Y_H - self.A(U_new))**2
+            
+            # 2. Terme d'attache aux données panchromatiques
+            R = PANDataset.spectral(U_new)
+            #U_flat = U_new.view(1, 31, -1)
+            #RU = torch.matmul(R, U_flat.squeeze(0)).unsqueeze(0)
+            #RU_reshaped = RU.view(1, 1, 1040, 1392)
+            data_term_m = 0.5 * self.lmbda_m * torch.norm(Y_M - torch.einsum('ij,jklm->iklm', R, U))**2
+            
+            # 3. Terme de régularisation TV
+            grad_U = nabla(U_new)  # [b,c,h,w,2]
+            tv_per_pixel = torch.sqrt(torch.sum(grad_U**2, dim=(1,4)))  # [b,h,w]
+            tv_term = self.lmbda * torch.sum(tv_per_pixel)
+            
+            # Coût total
+            total_cost = data_term_h + data_term_m + tv_term
+            
+            # Affichage du coût
+            if self.verbose and (it % 10 == 0 or it == self.max_iter - 1):
+                print(f"Iter {it:4d} | Coût total: {total_cost.item():.3e} | "
+                      f"Data H: {data_term_h.item():.3e} | "
+                      f"Data M: {data_term_m.item():.3e} | "
+                      f"TV: {tv_term.item():.3e}")
+            
+            # Vérification de la convergence
+            if it > 0 and self.convergence_criteria(U_new, U):
+                if self.verbose:
+                    print(f"Convergence atteinte à l'itération {it}")
+                break
+                
+            U = U_new
+        
         return U
