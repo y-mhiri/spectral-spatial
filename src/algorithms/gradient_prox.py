@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 from nabla import nabla, nabla_adjoint
 from pansharpening import PANDataset
 
-class ProximalGradient(nn.Module):
+class PANProximalGradient(nn.Module):
     """
     Algorithme de gradient proximal pour résoudre le problème de pansharpening hyperspectral.
     se que l'image de sortie sera blanche aussi
@@ -20,11 +20,12 @@ class ProximalGradient(nn.Module):
         tol (float): Critère de convergence
         A (function): Opérateur de sous-échantillonnage plus flou gaussien
         Aadj (function): Opérateur adjoint de A
+        R (torch.Tensor) : Function that computes the panchromatic size [?]
         scale (int): Facteur d'échelle
         verbose (bool): Affichage des informations
     """
 
-    def __init__(self, A, Aadj, max_iter, lmbda, lmbda_m, tau, tol, scale, verbose):
+    def __init__(self, A, Aadj, R, max_iter, lmbda, lmbda_m, tau, tol, scale, verbose):
         super(ProximalGradient, self).__init__()
         self.max_iter = max_iter
         self.scale = scale
@@ -35,6 +36,7 @@ class ProximalGradient(nn.Module):
         self.verbose = verbose
         self.A = A
         self.Aadj = Aadj
+        self.R = ?
 
     def convergence_criteria(self, U0, U1):
         """
@@ -49,6 +51,27 @@ class ProximalGradient(nn.Module):
         """
         return (torch.linalg.norm(U1-U0)/torch.linalg.norm(U0)) < self.tol
     
+    def compute_cost():
+            # Calcul des termes du coût
+            # 1. Terme d'attache aux données hyperspectrales
+            data_term_h = 0.5 * torch.norm(Y_H - self.A(U_new))**2
+            
+            # 2. Terme d'attache aux données panchromatiques
+            R = PANDataset.spectral(U_new)
+            #U_flat = U_new.view(1, 31, -1)
+            #RU = torch.matmul(R, U_flat.squeeze(0)).unsqueeze(0)
+            #RU_reshaped = RU.view(1, 1, 1040, 1392)
+            data_term_m = 0.5 * self.lmbda_m * torch.norm(Y_M - torch.einsum('ij,jklm->iklm', R, U))**2
+            
+            # 3. Terme de régularisation TV
+            grad_U = nabla(U_new)  # [b,c,h,w,2]
+            tv_per_pixel = torch.sqrt(torch.sum(grad_U**2, dim=(1,4)))  # [b,h,w]
+            tv_term = self.lmbda * torch.sum(tv_per_pixel)
+            
+            # Coût total
+            total_cost = data_term_h + data_term_m + tv_term
+
+
     def grad_f(self, U, Y_H, Y_M):
         """
         Calcule le gradient de la fonction f(U).
@@ -81,41 +104,41 @@ class ProximalGradient(nn.Module):
 
         return grad1 + grad2
     
-    def proj(self, z):
-        """
-        Projection sur la boule unité pour la norme l221.
+    # def proj(self, z):
+    #     """
+    #     Projection sur la boule unité pour la norme l221.
         
-        Args:
-            z (torch.Tensor): Tenseur [b,c,h,w,2]
+    #     Args:
+    #         z (torch.Tensor): Tenseur [b,c,h,w,2]
             
-        Returns:
-            torch.Tensor: Image projetée [b,c,h,w,2]
-        """
-        return z / torch.maximum(torch.norm(z, dim=-1, keepdim=True), torch.ones_like(z))
+    #     Returns:
+    #         torch.Tensor: Image projetée [b,c,h,w,2]
+    #     """
+    #     return z / torch.maximum(torch.norm(z, dim=-1, keepdim=True), torch.ones_like(z))
     
-    def grad_proj(self, x):
-        """
-        Descente de gradient projeté.
+    # def grad_proj(self, x):
+    #     """
+    #     Descente de gradient projeté.
         
-        Args:
-            x (torch.Tensor): Tenseur [b,c,h,w]
+    #     Args:
+    #         x (torch.Tensor): Tenseur [b,c,h,w]
             
-        Returns:
-            torch.Tensor: Minimum [b,c,h,w]
-        """
-        b, c, h, w = x.shape
-        z0 = torch.ones((b, c, h, w, 2))
+    #     Returns:
+    #         torch.Tensor: Minimum [b,c,h,w]
+    #     """
+    #     b, c, h, w = x.shape
+    #     z0 = torch.ones((b, c, h, w, 2))
         
-        for i in range(self.max_iter):
-            grad_z = -2 * nabla(nabla_adjoint(z0) + x / self.lmbda)
-            z = self.proj(z0 - self.tau * grad_z)
+    #     for i in range(self.max_iter):
+    #         grad_z = -2 * nabla(nabla_adjoint(z0) + x / self.lmbda)
+    #         z = self.proj(z0 - self.tau * grad_z)
             
-            if self.convergence_criteria(z, z0):
-                break
+    #         if self.convergence_criteria(z, z0):
+    #             break
                 
-            z0 = z
+    #         z0 = z
             
-        return z
+    #     return z
     
     def proxg(self, x):
         """
@@ -127,9 +150,10 @@ class ProximalGradient(nn.Module):
         Returns:
             torch.Tensor: Image projetée [b,c,h,w]
         """
-        z = torch.clone(x)
-        z = self.grad_proj(z)
-        return x + self.lmbda * nabla_adjoint(z)
+        # z = torch.clone(x)
+        # z = self.grad_proj(z)
+        # return x + self.lmbda * nabla_adjoint(z)
+        pass
     
     def forward(self, Y_H, Y_M):
         """
@@ -158,24 +182,8 @@ class ProximalGradient(nn.Module):
             # Mise à jour de U
             U_new = self.proxg(U - self.lmbda * grad_U)
             
-            # Calcul des termes du coût
-            # 1. Terme d'attache aux données hyperspectrales
-            data_term_h = 0.5 * torch.norm(Y_H - self.A(U_new))**2
-            
-            # 2. Terme d'attache aux données panchromatiques
-            R = PANDataset.spectral(U_new)
-            #U_flat = U_new.view(1, 31, -1)
-            #RU = torch.matmul(R, U_flat.squeeze(0)).unsqueeze(0)
-            #RU_reshaped = RU.view(1, 1, 1040, 1392)
-            data_term_m = 0.5 * self.lmbda_m * torch.norm(Y_M - torch.einsum('ij,jklm->iklm', R, U))**2
-            
-            # 3. Terme de régularisation TV
-            grad_U = nabla(U_new)  # [b,c,h,w,2]
-            tv_per_pixel = torch.sqrt(torch.sum(grad_U**2, dim=(1,4)))  # [b,h,w]
-            tv_term = self.lmbda * torch.sum(tv_per_pixel)
-            
-            # Coût total
-            total_cost = data_term_h + data_term_m + tv_term
+
+            total_cost = self.compute_cost(...)
             
             # Affichage du coût
             if self.verbose and (it % 10 == 0 or it == self.max_iter - 1):
