@@ -29,21 +29,24 @@ if __name__ == '__main__':
     data_path = '/home/ndiayem/Documents/spectral-spatial/data/harvard.zarr'
 
 
-    #val_transform = transforms.Compose([transforms.ToTensor()]) # Transforms a the input data to torch tensors
-    dataset = PANDataset(root_dir=data_path, split='train', transform= None)
+    val_transform = transforms.Compose([transforms.ToTensor()]) # Transforms a the input data to torch tensors
+    dataset = PANDataset(root_dir=data_path, split='train', transform= val_transform)
 
 
     idx = 17
-    X = torch.tensor(dataset[idx])
+    X = dataset[idx]
+    X = X.unsqueeze(0)
 
     # Matrice de transformation
     Y_H = dataset.simule_low_hsi(X)  
-    Y_M = dataset.get_panchromatic(idx)
-    Y_M = torch.tensor(Y_M)                                                             # Transposée de B 
+    Y_M = dataset.get_panchromatic(X)
+    Y_M = Y_M                                                             # Transposée de B 
     
 
     
-    pansharpening_model = ProximalGradient(dataset.simule_low_hsi,dataset.simule_low_hsi_adjoint , dataset.spectral,dataset.spectral_trans,max_iter=100, lmbda=0.1, lmbda_m=1, tau=0.1,tol=1e-7 ,scale = 8,verbose=True)
+    pansharpening_model = ProximalGradient(dataset.simule_low_hsi,dataset.simule_low_hsi_adjoint ,max_iter=100, lmbda=0.1, lmbda_m=1, tau=0.1,tol=1e-7 ,scale = 8,verbose=True)
 
     # Exécution de l'optimisation
     U_result = pansharpening_model.forward(Y_H, Y_M)
+
+    print('OK.')
