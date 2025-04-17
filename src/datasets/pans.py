@@ -4,19 +4,50 @@ from deepinv.physics import Blur, Downsampling
 from torchvision.transforms.functional import gaussian_blur
 import zarr
 from torch.utils import data
+import deepinv as dinv
 
-class PANDatasetImproved(data.Dataset):
+class PANDataset(data.Dataset):
+    """
+    Dataset amélioré pour le pansharpening hyperspectral
+    
+    Attributes:
+        file (zarr.Group): Accès aux données Zarr
+        split (str): Partition des données ('train'/'test'/'val')
+        transform (callable): Transformations à appliquer aux données
+        normalize (bool): Si True, normalise les données entre 0 et 1
+        scale (int): Facteur de sous-échantillonnage
+        sigma (float): Paramètre du flou gaussien
+        device (str): Device pour les opérations ('cpu' ou 'cuda')
+        nband (int): Nombre de bandes spectrales
+        height (int): Hauteur des images
+        width (int): Largeur des images
+        rgb_index (list): Indices des bandes RGB
+        wavenumbers: Plage spectrale des données
+        spatial_resolution: Résolution spatiale en mètres
+        spectral_resolution: Résolution spectrale en nm
+        blur_op (deepinv.physics.Blur): Opérateur de flou
+        downsample_op (deepinv.physics.Downsampling): Opérateur de sous-échantillonnage
+    """
+
     def __init__(self, root_dir, split='train', transform=None, normalize=False, 
-                 scale=4, sigma=1.0, device="cpu"):
+                 scale=4, sigma=1.0, device="cpu", size=None):
+        """
+        Args:
+            root_dir (str): Chemin vers le fichier Zarr
+            split (str): Partition des données ('train'/'test'/'val')
+            transform (callable): Transformations à appliquer
+            normalize (bool): Normalisation [0,1] si True
+            scale (int): Facteur de sous-échantillonnage
+            sigma (float): Paramètre du flou gaussien
+            device (str): Device pour les opérations
+            size (int): Taille de redimensionnement optionnelle
+        """
         super().__init__()
-        
-        # Chargement des données originales
+        # Initialisation des attributs
         self.file = zarr.open(root_dir, mode='r')
         self.split = split
         self.transform = transform
         self.normalize = normalize
-        
-        # Paramètres de traitement
         self.scale = scale
         self.sigma = sigma
         self.device = device
@@ -26,25 +57,22 @@ class PANDatasetImproved(data.Dataset):
         self.wavenumbers = self.file.attrs['spectral_range']
         self.spatial_resolution = self.file.attrs['spatial_resolution (m)']
         self.spectral_resolution = self.file.attrs['spectral_resolution (nm)']
+
+        # Dimensions des données
         self.nband = self.file[self.split][0][:].shape[2]
-        self.height = self.file[self.split][0][:].shape[0]
-        self.width = self.file[self.split][0][:].shape[1]
+        self.height = size if size else self.file[self.split][0][:].shape[0]
+        self.width = size if size else self.file[self.split][0][:].shape[1]
         
-        # Initialisation des opérateurs DeepInv
         self._init_operators()
 
     def _init_operators(self):
-        """Initialise les opérateurs de deepinv avec les bons paramètres"""
+        """Initialise les opérateurs de flou et sous-échantillonnage"""
         img_size = (self.nband, self.height, self.width)
-        
-        # Opérateur de flou
         self.blur_op = Blur(
-            filter=self._create_gaussian_kernel(),
+            filter=self._kernel_gaussien(),
             padding='circular',
             device=self.device
         )
-        
-        # Opérateur de sous-échantillonnage
         self.downsample_op = Downsampling(
             img_size=img_size,
             filter='gaussian',
@@ -53,75 +81,120 @@ class PANDatasetImproved(data.Dataset):
             device=self.device
         )
 
-    def _create_gaussian_kernel(self):
-        """Crée un filtre gaussien pour le flou"""
-        kernel_size = 5
-        sigma = (self.sigma, self.sigma)
-        return gaussian_blur(torch.ones(1, 1, kernel_size, kernel_size), 
-                            kernel_size=[kernel_size, kernel_size], 
-                            sigma=sigma)
-
+    def _kernel_gaussien(self):
+        """
+        Crée un filtre gaussien 2D
+        
+        Returns:
+            torch.Tensor: Kernel gaussien de shape [1, 1, k, k]
+        """
+        return dinv.physics.blur.gaussian_blur(sigma=(self.sigma,self.sigma), angle=0.0)
+    
     def __len__(self):
+        """
+        Returns:
+            int: Nombre d'échantillons dans le dataset
+        """
         return len(self.file[self.split])
 
     def __getitem__(self, idx):
-        # Chargement des données
+        """
+        Charge et transforme un échantillon
+        
+        Args:
+            idx (int): Index de l'échantillon
+            
+        Returns:
+            torch.Tensor: Image hyperspectrale [C, H, W]
+        """
         img = torch.from_numpy(self.file[self.split][idx][:]).float()
         img = img.permute(2, 0, 1)  # (H,W,C) -> (C,H,W)
         
-        # Normalisation si nécessaire
         if self.normalize:
             img = (img - img.min()) / (img.max() - img.min())
             
         if self.transform:
             img = self.transform(img)
-            
+                
         return img
 
-    # Opérateurs améliorés
     def blur(self, input_image):
-        """Flou gaussien optimisé avec deepinv"""
+        """
+        Applique un flou gaussien
+        
+        Args:
+            input_image (torch.Tensor): Image d'entrée [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Image floutée [b,c,h,w]
+        """
         return self.blur_op(input_image)
 
     def sub_sample(self, input_image):
-        """Sous-échantillonnage avec filtre anti-aliasing"""
+        """
+        Sous-échantillonne une image
+        
+        Args:
+            input_image (torch.Tensor): Image d'entrée [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Image sous-échantillonnée [b,c,h//scale,w//scale]
+        """
         return self.downsample_op(input_image)
 
-    def S_up(self, input_image):
-        """Sur-échantillonnage avec interpolation bilinéaire"""
-        return torch.nn.functional.interpolate(
-            input_image, 
-            scale_factor=self.scale, 
-            mode='bilinear',
-            align_corners=False
-        )
 
     def simule_low_hsi(self, input_image):
-        """Flou + sous-échantillonnage"""
+        """
+        Simule une acquisition basse résolution (flou + sous-échantillonnage)
+        
+        Args:
+            input_image (torch.Tensor): Image HR [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Image LR [b,c,h//scale,w//scale]
+        """
         if input_image.ndim != 4:
             raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
         return self.sub_sample(self.blur(input_image))
 
     def get_panchromatic(self, input_image):
-        """Moyenne spectrale normalisée"""
+        """
+        Calcule l'image panchromatique par moyenne spectrale
+        
+        Args:
+            input_image (torch.Tensor): Image hyperspectrale [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Image panchromatique [b,1,h,w]
+        """
         return input_image.mean(dim=1, keepdim=True)
 
     def simule_low_hsi_adjoint(self, input_image):
-        """Opérateur adjoint exact"""
+        """
+        Opérateur adjoint du simulateur basse résolution
+        
+        Args:
+            input_image (torch.Tensor): Image LR [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Approximation HR [b,c,h*scale,w*scale]
+        """
         if input_image.ndim != 4:
             raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
-        
-        # Utilisation de l'adjoint de Downsampling
         upsampled = self.downsample_op.A_adjoint(input_image)
         return self.blur_op(upsampled)
 
     @staticmethod
     def spectral(input_image):
-        """Opérateur spectral (moyenne spatiale)"""
-        _, c, h, w = input_image.shape
-        return torch.ones(1, c, device=input_image.device) / (h * w)
+        """
+        Calcule la signature spectrale moyenne
+        
+        Args:
+            input_image (torch.Tensor): Image [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Vecteur spectral moyen [1,c]
+        """
+        _, c, _,_= input_image.shape
+        return (1/c)*torch.ones(1,c, device=input_image.device)
 
-    @staticmethod
-    def spectral_trans(input_image):
-        """Transposé de l'opérateur spectral"""
-        return PANDatasetImproved.spectral(input_image).t()
