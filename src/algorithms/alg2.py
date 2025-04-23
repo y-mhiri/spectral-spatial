@@ -12,8 +12,8 @@ class PANTVCB(PANProximalGradient):
        cette fonction donne l'opérateur proximale de l'image d'entrée en faisant un algo de chamboll pock
 
     """
-    def __init__(self, A,Aadj, max_iter, lmbda, lmbda_m, tol, scale, verbose, params):
-        super().__init__(A, Aadj, max_iter, lmbda, lmbda_m, tol, scale, verbose)
+    def __init__(self, A,Aadj,spectral_op,spectral_op_t, max_iter, lmbda, lmbda_m, tol, scale, verbose, params):
+        super().__init__(A, Aadj,spectral_op,spectral_op_t ,max_iter, lmbda, lmbda_m, tol, scale, verbose)
 
         self.optim = TVPrior(**params)
 

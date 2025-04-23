@@ -1,6 +1,6 @@
 from gradient_prox import PANProximalGradient
 import torch
-from nabla import nabla, nabla_adjoint
+from gradient import gradient, divergence
 import numpy as np
 
 
@@ -13,7 +13,7 @@ class PANTVGradProj(PANProximalGradient):
         tau (float): Pas de descente
     """
 
-    def __init__(self, A, Aadj, max_iter, lmbda, lmbda_m, tau, tol, scale, verbose, max_iter_gp):
+    def __init__(self, A, Aadj,spectral_op,spectral_op_t, max_iter, lmbda, lmbda_m, tau, tol, scale, verbose, max_iter_gp):
         """
         Initialise les paramètres de l'algorithme.
         
@@ -21,7 +21,7 @@ class PANTVGradProj(PANProximalGradient):
             max_iter_gp (int): Nombre max d'itérations pour la sous-optimisation
             tau (float): Pas de descente pour le gradient projeté
         """
-        super().__init__(A, Aadj,max_iter, lmbda, lmbda_m, tol, scale, verbose)
+        super().__init__(A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda, lmbda_m, tol, scale, verbose)
         self.max_iter_gp = max_iter_gp
         self.tau = tau
 
@@ -59,7 +59,7 @@ class PANTVGradProj(PANProximalGradient):
             w_prev = w.clone()
             
             # Calcul du gradient
-            grad_z = 2 * nabla(nabla_adjoint(y) + x / self.lmbda)
+            grad_z = -2 * gradient(divergence(y) + x / self.lmbda)
             
             # Mise à jour avec projection
             w = self.proj(y - self.tau * grad_z)
@@ -86,4 +86,4 @@ class PANTVGradProj(PANProximalGradient):
             torch.Tensor: Image régularisée [b,c,h,w]
         """
         z = self.grad_proj(x)
-        return x + self.lmbda * nabla_adjoint(z)
+        return x + self.lmbda * divergence(z)
