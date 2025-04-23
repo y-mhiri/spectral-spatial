@@ -2,7 +2,7 @@ import sys
 import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
-from nabla import nabla, nabla_adjoint
+from nabla import nabla
 
 sys.path.append('src/datasets')
 sys.path.append('src/algorithms')
@@ -23,7 +23,7 @@ class PANProximalGradient(nn.Module):
         R (torch.Tensor): Matrice de projection panchromatique
     """
 
-    def __init__(self, A, Aadj,max_iter, lmbda, lmbda_m, tol, scale, verbose):
+    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda, lmbda_m, tol, scale, verbose):
         super().__init__()
         self.max_iter = max_iter
         self.scale = scale
@@ -33,6 +33,19 @@ class PANProximalGradient(nn.Module):
         self.verbose = verbose
         self.A = A
         self.Aadj = Aadj
+        self.spectral_op = spectral_op
+        self.spectral_op_t = spectral_op_t
+    
+
+
+
+    def ctv_norm(self,U, p, q, r):
+        """Calcule la norme CTV l^p,q,r d'un tenseur A (shape: b x c x hx w x 2 )."""
+        # Ordre: p sur canaux (axis=1), q sur dérivées (axis=-1), r sur pixels (axis=(2,3))
+        norm_p = torch.sum(torch.abs(U)**p, axis=1, keepdims=True)**(1/p)
+        norm_q = torch.sum(norm_p**q, axis=-1, keepdims=True)**(1/q)
+        norm_r = torch.sum(norm_q**r, axis=(2,3), keepdims=True)**(1/r)
+        return norm_r
         
 
     def convergence_criteria(self, U0, U1):
@@ -48,7 +61,7 @@ class PANProximalGradient(nn.Module):
         """
         return (torch.linalg.norm(U1-U0)/torch.linalg.norm(U0)) < self.tol
     
-    def compute_cost(self, U, Y_H, Y_M,R):
+    def compute_cost(self, U, Y_H, Y_M):
         """
         Calcule le coût total de la fonction objective.
         
@@ -64,19 +77,18 @@ class PANProximalGradient(nn.Module):
         data_term_h = 0.5 * torch.norm(self.A(U)-Y_H)**2
         
         # Terme d'attache aux données panchromatiques
-        U_flat = U.view(1, 31, -1)
-        RU = torch.matmul(R, U_flat.squeeze(0)).unsqueeze(0)
-        RU_reshaped = RU.view(1, 1, U.shape[2], U.shape[3])
-        data_term_m = 0.5 * self.lmbda_m * torch.norm(RU_reshaped-Y_M)**2
+        
+        data_term_m = 0.5 * self.lmbda_m * torch.norm(self.spectral_op(U)-Y_M)**2
         
         # Terme de régularisation TV
         grad_U = nabla(U)
-        tv_per_pixel = torch.sqrt(torch.sum(grad_U**2, dim=(1,4)))
-        tv_term = self.lmbda * torch.sum(tv_per_pixel)
+        #tv_per_pixel = torch.sqrt(torch.sum(grad_U**2, dim=(1,4)))
+        #torch.sum(tv_per_pixel)
+        tv_term = self.lmbda * self.ctv_norm(grad_U,2,1,1)
         
-        return data_term_h + data_term_m + tv_term
+        return data_term_h + data_term_m + tv_term ,data_term_h,data_term_m,tv_term
 
-    def grad_f(self, U, Y_H, Y_M ,R):
+    def grad_f(self, U, Y_H, Y_M):
         """
         Calcule le gradient de la fonction objective.
         
@@ -92,11 +104,10 @@ class PANProximalGradient(nn.Module):
         grad1 = self.Aadj((self.A(U) - Y_H))
         
         # Terme 2: Gradient de (λ_m/2) ||Y_M - RU||²
-        U_flat = U.view(1, 31, -1)
-        RU = torch.matmul(R, U_flat.squeeze(0)).unsqueeze(0)
-        subtracted = RU.view(1, 1, U.shape[2], U.shape[3]) - Y_M
-        grad2_flat = torch.matmul(R.t(), subtracted.view(1, 1, -1))
-        grad2 = self.lmbda_m * grad2_flat.view(1, 31, U.shape[2], U.shape[3])
+        
+        subtracted = self.spectral_op(U) - Y_M
+        RT_subtracted = self.spectral_op_t(subtracted)
+        grad2 = self.lmbda_m * RT_subtracted
         
         return grad1 + grad2
     
@@ -104,7 +115,7 @@ class PANProximalGradient(nn.Module):
         """Opérateur proximal (à implémenter)."""
         raise NotImplementedError("L'opérateur proximal doit être implémenté")
         
-    def forward(self, Y_H, Y_M,R):
+    def forward(self, Y_H, Y_M):
         """
         Résout le problème d'optimisation complet.
         
@@ -127,20 +138,16 @@ class PANProximalGradient(nn.Module):
             U_prev = U.clone()
             
             # Étape de gradient
-            grad = self.grad_f(U, Y_H, Y_M,R)
+            grad = self.grad_f(U, Y_H, Y_M)
             U = self.proxg(U - self.lmbda * grad)
             
             # Calcul des métriques
-            total_cost = self.compute_cost(U, Y_H, Y_M,R)
+            total_cost,data_term_h,data_term_m,tv_term = self.compute_cost(U, Y_H, Y_M)
             delta_U = torch.norm(U - U_prev).item() / (torch.norm(U_prev).item() + 1e-8)
             cost_history.append(total_cost.item())
             
             # Affichage conditionnel
             if self.verbose and (it % 10 == 0 or it == self.max_iter - 1 or delta_U < self.tol):
-                data_term_h = 0.5 * torch.norm(Y_H - self.A(U))**2
-                RU = torch.matmul(R, U.view(1, 31, -1)).view(1, 1, *U.shape[2:])
-                data_term_m = 0.5 * self.lmbda_m * torch.norm(Y_M - RU)**2
-                tv_term = self.lmbda * torch.sum(torch.norm(nabla(U), dim=-1))
                 
                 print(f"{it:<5} | {total_cost.item():<12.3e} | {data_term_h.item():<12.3e} | "
                       f"{data_term_m.item():<12.3e} | {tv_term.item():<12.3e} | {delta_U:<12.3e}")
