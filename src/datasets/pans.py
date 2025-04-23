@@ -80,6 +80,7 @@ class PANDataset(data.Dataset):
             padding='circular',
             device=self.device
         )
+        self.R = self.spectral()
 
     def _kernel_gaussien(self):
         """
@@ -184,8 +185,8 @@ class PANDataset(data.Dataset):
         upsampled = self.downsample_op.A_adjoint(input_image)
         return self.blur_op(upsampled)
 
-    @staticmethod
-    def spectral(input_image):
+    
+    def spectral(self):
         """
         Calcule la signature spectrale moyenne
         
@@ -195,6 +196,38 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Vecteur spectral moyen [1,c]
         """
-        _, c, _,_= input_image.shape
-        return (1/c)*torch.ones(1,c, device=input_image.device)
+        c = self.nband
+        return (1/c)*torch.ones(1,c, device=self.device)
+    
+    def spectral_op(self,imput_image):
+        """
+        Calcule la signature spectrale moyenne
+        
+        Args:
+            input_image (torch.Tensor): Image [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Vecteur spectral moyen [1,c]
+        """
+        U_flat = imput_image.view(1, 31, -1)
+        RU = torch.matmul(self.R, U_flat.squeeze(0)).unsqueeze(0)
+        RU = RU.view(1, 1, self.height,self.width)
+        return RU
+    
+
+    def spectral_op_t(self,imput_image):
+        """
+        Calcule la signature spectrale moyenne
+        
+        Args:
+            input_image (torch.Tensor): Image [b,c,h,w]
+            
+        Returns:
+            torch.Tensor: Vecteur spectral moyen [1,c]
+        """
+        imput_image = imput_image.view(1, 1, -1)
+        RU_t = torch.matmul(self.R.t(), imput_image)
+        RU_t = RU_t.view(1, 31, self.height,self.width)
+        return RU_t
+
 
