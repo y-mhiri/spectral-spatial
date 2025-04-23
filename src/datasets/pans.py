@@ -30,7 +30,7 @@ class PANDataset(data.Dataset):
     """
 
     def __init__(self, root_dir, split='train', transform=None, normalize=False, 
-                 scale=4, sigma=1.0, device="cpu", size=None):
+                 scale=4, sigma=1.0, device="cpu", size=None, seed=0):
         """
         Args:
             root_dir (str): Chemin vers le fichier Zarr
@@ -51,6 +51,7 @@ class PANDataset(data.Dataset):
         self.scale = scale
         self.sigma = sigma
         self.device = device
+        self.seed = seed
         
         # Métadonnées
         self.rgb_index = self.file.attrs['rgb']
@@ -80,7 +81,7 @@ class PANDataset(data.Dataset):
             padding='circular',
             device=self.device
         )
-        self.R = self.spectral()
+        self.R = self.create_spectral_matrix()
 
     def _kernel_gaussien(self):
         """
@@ -118,33 +119,20 @@ class PANDataset(data.Dataset):
             img = self.transform(img)
                 
         return img
+    
 
-    def blur(self, input_image):
-        """
-        Applique un flou gaussien
-        
-        Args:
-            input_image (torch.Tensor): Image d'entrée [b,c,h,w]
-            
-        Returns:
-            torch.Tensor: Image floutée [b,c,h,w]
-        """
-        return self.blur_op(input_image)
+    def get_operators(self):
 
-    def sub_sample(self, input_image):
-        """
-        Sous-échantillonne une image
-        
-        Args:
-            input_image (torch.Tensor): Image d'entrée [b,c,h,w]
-            
-        Returns:
-            torch.Tensor: Image sous-échantillonnée [b,c,h//scale,w//scale]
-        """
-        return self.downsample_op(input_image)
+        A = lambda x : self.downsample_op(self.blur_op(x))
+        A_adj = lambda x : self.blur_op(self.downsample_op.A_adjoint(x))
+
+        R = lambda x : self.spectral_op(x)
+        R_adj = lambda x : self.spectral_op_t(x)
+
+        return A, A_adj, R, R_adj
 
 
-    def simule_low_hsi(self, input_image):
+    def simulate_low_res_hsi(self, input_image):
         """
         Simule une acquisition basse résolution (flou + sous-échantillonnage)
         
@@ -156,7 +144,7 @@ class PANDataset(data.Dataset):
         """
         if input_image.ndim != 4:
             raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
-        return self.sub_sample(self.blur(input_image))
+        return self.downsample_op(self.blur_op(input_image)) + self.noise()
 
     def get_panchromatic(self, input_image):
         """
@@ -168,25 +156,26 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Image panchromatique [b,1,h,w]
         """
-        return input_image.mean(dim=1, keepdim=True)
+        return self.spectral_op(input_image) + self.noise()
+    
 
-    def simule_low_hsi_adjoint(self, input_image):
-        """
-        Opérateur adjoint du simulateur basse résolution
+    # def simule_low_hsi_adjoint(self, input_image):
+    #     """
+    #     Opérateur adjoint du simulateur basse résolution
         
-        Args:
-            input_image (torch.Tensor): Image LR [b,c,h,w]
+    #     Args:
+    #         input_image (torch.Tensor): Image LR [b,c,h,w]
             
-        Returns:
-            torch.Tensor: Approximation HR [b,c,h*scale,w*scale]
-        """
-        if input_image.ndim != 4:
-            raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
-        upsampled = self.downsample_op.A_adjoint(input_image)
-        return self.blur_op(upsampled)
+    #     Returns:
+    #         torch.Tensor: Approximation HR [b,c,h*scale,w*scale]
+    #     """
+    #     if input_image.ndim != 4:
+    #         raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
+    #     upsampled = self.downsample_op.A_adjoint(input_image)
+    #     return self.blur_op(upsampled)
 
     
-    def spectral(self):
+    def create_spectral_matrix(self):
         """
         Calcule la signature spectrale moyenne
         
@@ -199,7 +188,7 @@ class PANDataset(data.Dataset):
         c = self.nband
         return (1/c)*torch.ones(1,c, device=self.device)
     
-    def spectral_op(self,imput_image):
+    def spectral_op(self,input_image):
         """
         Calcule la signature spectrale moyenne
         
@@ -209,7 +198,7 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Vecteur spectral moyen [1,c]
         """
-        U_flat = imput_image.view(1, 31, -1)
+        U_flat = input_image.view(1, 31, -1)
         RU = torch.matmul(self.R, U_flat.squeeze(0)).unsqueeze(0)
         RU = RU.view(1, 1, self.height,self.width)
         return RU
@@ -230,4 +219,5 @@ class PANDataset(data.Dataset):
         RU_t = RU_t.view(1, 31, self.height,self.width)
         return RU_t
 
-
+    def noise(self):
+        return torch.

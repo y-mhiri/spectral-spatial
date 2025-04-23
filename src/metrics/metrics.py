@@ -14,7 +14,7 @@ def CC(A,B):
 
     return (A*B).sum()/(torch.norm(A)*torch.norm(B))
 
-def SNR(A,B):
+def PSNR(A,B):
     assert A.shape == B.shape, "A and B must have the same shape"
 
     return 10*torch.log10(1/(RNMSE(A,B)**2))
@@ -27,6 +27,11 @@ def SAM(A,B):
 
     return torch.acos((A*B).sum(dim=0)).mean()
 
+def SSIM(A,B):
+    """
+    
+    """
+    pass
 
 
 def compute_metrics(gt,est, numpy=False):
@@ -34,10 +39,10 @@ def compute_metrics(gt,est, numpy=False):
     if numpy==True:
         return {'RNMSE': RNMSE(gt,est).cpu().numpy().tolist(),
                 'CC': CC(gt,est).cpu().numpy().tolist(),
-                'SNR': SNR(gt,est).cpu().numpy().tolist(),
+                'PSNR': PSNR(gt,est).cpu().numpy().tolist(),
                 'SAM': SAM(gt,est).cpu().numpy().tolist()}
 
     return {'RNMSE': RNMSE(gt,est),
             'CC': CC(gt,est),
-            'SNR': SNR(gt,est),
+            'PSNR': PSNR(gt,est),
             'SAM': SAM(gt,est)}

@@ -5,11 +5,9 @@ sys.path.append(f'{path}/datasets')
 sys.path.append(f'{path}/metrics')
 
 import argparse
-
 import torch
 import zarr
-
-import matplotlib.pyplot as plt
+import time
 
 from datasets import HSIDataset
 from tv_plus_grad_alignement import TVGradAlignement
@@ -19,7 +17,6 @@ from math import sqrt
 from metrics import compute_metrics
 
 from torchvision import transforms
-import time
 
 
 

@@ -1,10 +1,10 @@
-from gradient_prox import PANProximalGradient
+from algorithms.pan_gradient_prox import PANProximalGradient
 import torch
 
 
 
 
-class PANTVCtv(PANProximalGradient):
+class PANTVCTV(PANProximalGradient):
     """
     Calcul de l'opérateur proximal de la TV vectorielle par descente de gradient projeté.
     
@@ -26,20 +26,7 @@ class PANTVCtv(PANProximalGradient):
         self.q = q
         self.r = r
         
-
-    def project_dual_ball(self , U, p_star, q_star, r_star):
-        """Projection sur la boule duale l^{p*,q*,r*} <= 1."""
-        # Normalisation par la norme duale
-        norm_p_star = torch.sum(torch.abs(U)**p_star, axis=1, keepdims=True)**(1/p_star)
-        norm_q_star = torch.sum(norm_p_star**q_star, axis=-1, keepdims=True)**(1/q_star)
-        norm_r_star = torch.sum(norm_q_star**r_star, axis=(2,3), keepdims=True)**(1/r_star)
-        
-        # Scaling pour respecter la contrainte
-        scaling = torch.maximum(torch.tensor(1.0, device=U.device), norm_r_star)
-        return U / scaling
     
-    import torch
-
     def project_dual_ball_r(self, U, p_star, q_star, r_star, eps=1e-8):
         """
         Projection sur la boule duale l^{p*,q*,r*} <= 1.
@@ -66,18 +53,6 @@ class PANTVCtv(PANProximalGradient):
         # Scaling pour respecter ||U||_{p*,q*,r*} <= 1
         scaling = torch.maximum(torch.tensor(1.0, device=U.device), norm_r_star)
         return U / (scaling + eps)
-
-    #def proxg(self,x):
-        #"""Opérateur proximal pour la norme CTV l^p,q,r."""
-        # Étape 1: Calcul de la projection duale
-        #x_tilde = x/ self.lmbda
-        #p_star, q_star, r_star = 1/(1-1/self.p), 1/(1-1/self.q), 1/(1-1/self.r)  # Dual exponents
-        
-        # Projection sur la boule duale (l^{p*,q*,r*} <= 1)
-        #proj = self.project_dual_ball(x_tilde, p_star, q_star, r_star)
-        
-        # Étape 2: Formule de Moreau
-        #return x- self.lmbda * proj
 
 
     def proxg(self, x):

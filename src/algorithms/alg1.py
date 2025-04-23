@@ -1,4 +1,4 @@
-from gradient_prox import PANProximalGradient
+from algorithms.pan_gradient_prox import PANProximalGradient
 import torch
 from gradient import gradient, divergence
 import numpy as np
