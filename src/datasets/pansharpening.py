@@ -5,6 +5,7 @@ from torchvision.transforms.functional import gaussian_blur
 import zarr
 from torch.utils import data
 import deepinv as dinv
+from deepinv.physics import GaussianNoise, Denoising
 
 class PANDataset(data.Dataset):
     """
@@ -30,7 +31,7 @@ class PANDataset(data.Dataset):
     """
 
     def __init__(self, root_dir, split='train', transform=None, normalize=False, 
-                 scale=4, sigma=1.0, device="cpu", size=None, seed=0):
+                 scale=4, sigma=1.0,sigma1 = 0.01, device="cpu", size=None, seed=0):
         """
         Args:
             root_dir (str): Chemin vers le fichier Zarr
@@ -50,6 +51,7 @@ class PANDataset(data.Dataset):
         self.normalize = normalize
         self.scale = scale
         self.sigma = sigma
+        self.sigma1 = sigma1
         self.device = device
         self.seed = seed
         
@@ -144,7 +146,7 @@ class PANDataset(data.Dataset):
         """
         if input_image.ndim != 4:
             raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
-        return self.downsample_op(self.blur_op(input_image)) + self.noise()
+        return self.noise(self.downsample_op(self.blur_op(input_image)))
 
     def get_panchromatic(self, input_image):
         """
@@ -156,24 +158,7 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Image panchromatique [b,1,h,w]
         """
-        return self.spectral_op(input_image) + self.noise()
-    
-
-    # def simule_low_hsi_adjoint(self, input_image):
-    #     """
-    #     Opérateur adjoint du simulateur basse résolution
-        
-    #     Args:
-    #         input_image (torch.Tensor): Image LR [b,c,h,w]
-            
-    #     Returns:
-    #         torch.Tensor: Approximation HR [b,c,h*scale,w*scale]
-    #     """
-    #     if input_image.ndim != 4:
-    #         raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
-    #     upsampled = self.downsample_op.A_adjoint(input_image)
-    #     return self.blur_op(upsampled)
-
+        return self.noise(self.spectral_op(input_image))
     
     def create_spectral_matrix(self):
         """
@@ -198,7 +183,8 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Vecteur spectral moyen [1,c]
         """
-        U_flat = input_image.view(1, 31, -1)
+        input_image = input_image.contiguous()
+        U_flat = input_image.view(1,self.nband, -1)
         RU = torch.matmul(self.R, U_flat.squeeze(0)).unsqueeze(0)
         RU = RU.view(1, 1, self.height,self.width)
         return RU
@@ -216,8 +202,11 @@ class PANDataset(data.Dataset):
         """
         imput_image = imput_image.view(1, 1, -1)
         RU_t = torch.matmul(self.R.t(), imput_image)
-        RU_t = RU_t.view(1, 31, self.height,self.width)
+        RU_t = RU_t.view(1,self.nband, self.height,self.width)
         return RU_t
 
-    def noise(self):
-        return torch.
+    def noise(self,imput_image):
+        noise_model = GaussianNoise(self.sigma1)
+        physics = Denoising(device=imput_image.device, noise_model=noise_model)
+        observation = physics(imput_image)
+        return observation
