@@ -8,9 +8,11 @@ from nabla import nabla, nabla_adjoint
 
 class TVPrior(ChambollePock):
 
-    def __init__(self,*args, **kwargs):
+    def __init__(self, p, q, r, *args, **kwargs):
         super(TVPrior, self).__init__(*args, **kwargs)
-        
+        self.p = p 
+        self.q = q
+        self.r = r
 
  
 
@@ -58,19 +60,19 @@ class TVPrior(ChambollePock):
         return (sigma2*u + tau * y) / (sigma2 + tau)
 
 
-    def prox_sigma_g_conj(self, q, sigma):
-        r"""
+    # def prox_sigma_g_conj(self, q, sigma):
+    #     r"""
         
-        Proximal operator of TV.
+    #     Proximal operator of TV.
 
 
-        """
+    #     """
 
-        return q / torch.maximum(torch.norm(q, dim=-1, keepdim=True), torch.ones_like(q))
+    #     return q / torch.maximum(torch.norm(q, dim=-1, keepdim=True), torch.ones_like(q))
     
 
 
-    def prox_sigma_g_conj1(self, U, eps=1e-8):
+    def prox_sigma_g_conj(self, U, eps=1e-8):
         """
         Projection sur la boule duale l^{p*,q*,r*} <= 1.
         Gère explicitement p*, q*, r* = infinity.
