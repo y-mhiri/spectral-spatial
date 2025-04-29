@@ -8,8 +8,9 @@ from nabla import nabla, nabla_adjoint
 
 class TVPrior(ChambollePock):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self,*args, **kwargs):
         super(TVPrior, self).__init__(*args, **kwargs)
+        
 
  
 
@@ -66,6 +67,48 @@ class TVPrior(ChambollePock):
         """
 
         return q / torch.maximum(torch.norm(q, dim=-1, keepdim=True), torch.ones_like(q))
+    
+
+
+    def prox_sigma_g_conj1(self, U, eps=1e-8):
+        """
+        Projection sur la boule duale l^{p*,q*,r*} <= 1.
+        Gère explicitement p*, q*, r* = infinity.
+        """
+
+        def get_dual_exponent(val):
+            if val == 1:
+                return torch.inf
+            elif torch.isinf(torch.tensor(val)):
+                return 1.0
+            else:
+                return 1 / (1 - 1/val)
+
+        p_star = get_dual_exponent(self.p)
+        q_star = get_dual_exponent(self.q)
+        r_star = get_dual_exponent(self.r)
+        # Étape 1: Norme p* sur les canaux (axis=1)
+        if torch.isinf(torch.tensor(p_star, device=U.device)):
+            norm_p_star= torch.amax(torch.abs(U), dim=1, keepdim=True) # l^infini
+        else:
+            norm_p_star = torch.sum(torch.abs(U)**p_star, dim=1, keepdim=True)**(1/(p_star + eps))
+
+        # Étape 2: Norme q* sur les dérivées (axis=-1)
+        if torch.isinf(torch.tensor(q_star, device=U.device)):
+            norm_q_star= torch.amax(torch.abs(norm_p_star), dim=-1, keepdim=True)   # l^infini
+        else:
+            norm_q_star = torch.sum(norm_p_star**q_star, dim=-1, keepdim=True)**(1/(q_star + eps))
+
+        # Étape 3: Norme r* sur les pixels (axis=(2,3))
+        if torch.isinf(torch.tensor(r_star, device=U.device)):
+            norm_r_star= torch.amax(torch.abs(norm_q_star), dim=(2,3), keepdim=True)  # l^infini
+        else:
+            norm_r_star = torch.sum(norm_q_star**r_star, dim=(2,3), keepdim=True)**(1/(r_star + eps))
+
+        # Scaling pour respecter ||U||_{p*,q*,r*} <= 1
+        scaling = torch.maximum(torch.tensor(1.0, device=U.device), norm_r_star)
+        return U / (scaling + eps)
+    
         
 
     def loss_fn(self, u, y, lmbda):

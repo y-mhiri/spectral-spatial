@@ -23,7 +23,7 @@ class PANProximalGradient(nn.Module):
         R (torch.Tensor): Matrice de projection panchromatique
     """
 
-    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda, lmbda_m, tol, scale, verbose):
+    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda, lmbda_m, tol,scale,p,q,r,verbose):
         super().__init__()
         self.max_iter = max_iter
         self.scale = scale
@@ -35,16 +35,54 @@ class PANProximalGradient(nn.Module):
         self.Aadj = Aadj
         self.spectral_op = spectral_op
         self.spectral_op_t = spectral_op_t
+        self.p = p
+        self.q = q 
+        self.r = r
     
 
 
 
-    def ctv_norm(self,U, p, q, r):
+    def ctv_norm(self, U,eps=1e-8):
+        """
+        Calcule la norme CTV l^p,q,r avec support pour p,q,r = infini.
+        
+        Args:
+            U (torch.Tensor): Tenseur de gradients [b,c,h,w,2]
+            p, q, r (float or torch.inf): Exposants de la norme
+            eps (float): Petite valeur pour stabilité numérique
+            
+        Returns:
+            torch.Tensor: Norme CTV [b,1,1,1]
+        """
+        # Norme p sur les canaux (axis=1)
+        if torch.isinf(torch.tensor(self.p)):
+            norm_p = torch.amax(torch.abs(U), dim=1, keepdim=True)  # l^infini
+        else:
+            norm_p = torch.sum(torch.abs(U)**self.p, dim=1, keepdim=True)**(1/(self.p + eps))
+
+        # Norme q sur les dérivées (axis=-1)
+        if torch.isinf(torch.tensor(self.q)):
+            norm_q = torch.amax(torch.abs(norm_p), dim=-1, keepdim=True)  # l^infini
+        else:
+            norm_q = torch.sum(norm_p**self.q, dim=-1, keepdim=True)**(1/(self.q + eps))
+
+        # Norme r sur les pixels (axis=(2,3))
+        if torch.isinf(torch.tensor(self.r)):
+            norm_r = torch.amax(torch.abs(norm_q), dim=(2,3), keepdim=True)  # l^infini
+        else:
+            norm_r = torch.sum(norm_q**self.r, dim=(2,3), keepdim=True)**(1/(self.r + eps))
+
+        return norm_r
+        
+    
+    
+    
+    def ctv_norm1(self,U, p, q, r):
         """Calcule la norme CTV l^p,q,r d'un tenseur A (shape: b x c x hx w x 2 )."""
         # Ordre: p sur canaux (axis=1), q sur dérivées (axis=-1), r sur pixels (axis=(2,3))
-        norm_p = torch.sum(torch.abs(U)**p, axis=1, keepdims=True)**(1/p)
-        norm_q = torch.sum(norm_p**q, axis=-1, keepdims=True)**(1/q)
-        norm_r = torch.sum(norm_q**r, axis=(2,3), keepdims=True)**(1/r)
+        norm_p = torch.sum(torch.abs(U)**p, dim=1, keepdim=True)**(1/p)
+        norm_q = torch.sum(norm_p**q, dim=-1, keepdim=True)**(1/q)
+        norm_r = torch.sum(norm_q**r, dim=(2,3), keepdim=True)**(1/r)
         return norm_r
         
 
@@ -84,7 +122,7 @@ class PANProximalGradient(nn.Module):
         grad_U = nabla(U)
         #tv_per_pixel = torch.sqrt(torch.sum(grad_U**2, dim=(1,4)))
         #torch.sum(tv_per_pixel)
-        tv_term = self.lmbda * self.ctv_norm(grad_U,2,1,1)
+        tv_term = self.lmbda * self.ctv_norm(grad_U,eps=1e-8)
         
         return data_term_h + data_term_m + tv_term ,data_term_h,data_term_m,tv_term
 
@@ -134,6 +172,7 @@ class PANProximalGradient(nn.Module):
             print(f"{'It':<5} | {'Coût total':<12} | {'Data H':<12} | {'Data M':<12} | {'TV':<12} | {'ΔU':<12}")
             print("-" * 80)
         
+        cost_history = torch.zeros(self.max_iter)
         for it in range(self.max_iter):
             U_prev = U.clone()
             
@@ -144,7 +183,7 @@ class PANProximalGradient(nn.Module):
             # Calcul des métriques
             total_cost,data_term_h,data_term_m,tv_term = self.compute_cost(U, Y_H, Y_M)
             delta_U = torch.norm(U - U_prev).item() / (torch.norm(U_prev).item() + 1e-8)
-            cost_history.append(total_cost.item())
+            cost_history[it] = total_cost.item()
             
             # Affichage conditionnel
             if self.verbose and (it % 10 == 0 or it == self.max_iter - 1 or delta_U < self.tol):
