@@ -1,0 +1,16 @@
+datasets:
+  harvard: /home/ndiayem/Documents/spectral-spatial/data/harvard.zarr
+experiment:
+  date: '2025-05-07T15:10:36.494194'
+  parameters:
+    lambda: 0.01
+    lambda_m: 5.0
+    max_iter: 100
+    max_iter_gp: 100
+    noise_level: 0.05
+    p: 2.0
+    q: 2.0
+    r: 1.0
+    scale: 4
+    sigma: 1.0
+    tau: 0.8
