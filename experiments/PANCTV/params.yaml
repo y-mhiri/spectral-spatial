@@ -16,10 +16,18 @@ fixed_args:
     '--p': 1
     '--q': 1
     '--r': 1
-    '--noise_level': 0.1
     '--sigma': 0.1
     '--scale': 4
 
 
 
-        
+varying_args:
+  - options:
+    '--noise_level': 0.001
+  - options:
+    '--noise_level': 0.01
+  - options:
+    '--noise_level': 0.1
+  - options:
+    '--noise_level': 1
+
