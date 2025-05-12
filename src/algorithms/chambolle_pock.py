@@ -117,7 +117,7 @@ class ChambollePock(nn.Module):
         """
         pass
 
-    def forward(self, y, init=None, verbose=True, params={}):
+    def forward(self, y, init=None, verbose=True, params={}, return_loss=True):
         """
             Solve the optimization problem using the Chambolle-Pock algorithm
 
@@ -154,7 +154,8 @@ class ChambollePock(nn.Module):
 
         if verbose:
             print(f'Chambolle Pock algorithm starting...')
-        for it in tqdm(range(self.max_iter)):
+        # for it in tqdm(range(self.max_iter)):
+        for it in range(self.max_iter):
             
             u_old = torch.clone(u)
 
@@ -180,12 +181,15 @@ class ChambollePock(nn.Module):
                 print('Cost function: ', loss[it])
 
             
-            if rel[it] < self.tol:
+            if rel[it] < self.tol and verbose:
                 print('Iteration: ', it, 'relative variation: ', torch.norm(u - u_old)/torch.norm(u_old))
                 print(f'Converged after {it+1} iterations.')
                 break
 
-        return u, loss, rel
+        if return_loss:
+            return u, loss, rel
+        else:
+            return u
         
 
     
