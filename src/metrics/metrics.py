@@ -1,4 +1,5 @@
 import torch
+from deepinv.loss.metric import SSIM
 
 
 def RNMSE(A,B):
@@ -22,16 +23,15 @@ def PSNR(A,B):
 def SAM(A,B):
     assert A.shape == B.shape, "A and B must have the same shape"
 
-    A = A/A.norm(dim=0)
-    B = B/B.norm(dim=0)
+    A = A/A.norm(dim=1)
+    B = B/B.norm(dim=1)
 
-    return torch.acos((A*B).sum(dim=0)).mean()
+    return torch.acos((A*B).sum(dim=1)).mean()
 
-def SSIM(A,B):
-    """
-    
-    """
-    pass
+def SSIME(A,B):
+    assert A.shape == B.shape ,""" assert A.shape == B.shape, "A and B must have the same shape """
+    m = SSIM()
+    return m(B,A)
 
 
 def compute_metrics(gt,est, numpy=False):
@@ -40,9 +40,11 @@ def compute_metrics(gt,est, numpy=False):
         return {'RNMSE': RNMSE(gt,est).cpu().numpy().tolist(),
                 'CC': CC(gt,est).cpu().numpy().tolist(),
                 'PSNR': PSNR(gt,est).cpu().numpy().tolist(),
-                'SAM': SAM(gt,est).cpu().numpy().tolist()}
+                'SAM': SAM(gt,est).cpu().numpy().tolist(),
+                'SSIM': SSIME(gt,est).cpu().numpy().tolist()}
 
     return {'RNMSE': RNMSE(gt,est),
             'CC': CC(gt,est),
             'PSNR': PSNR(gt,est),
-            'SAM': SAM(gt,est)}
+            'SAM': SAM(gt,est),
+            'SSIM': SSIME(gt,est)}
