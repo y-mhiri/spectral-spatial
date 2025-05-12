@@ -22,12 +22,14 @@ fixed_args:
 
 
 varying_args:
-  - options:
-    '--noise_level': 0.001
-  - options:
-    '--noise_level': 0.01
-  - options:
-    '--noise_level': 0.1
-  - options:
-    '--noise_level': 1
+
+    groups: 
+        - options: 
+            '--noise_level': 0.0001
+        - options: 
+            '--noise_level': 0.001
+        - options: 
+            '--noise_level': 0.01
+        - options: 
+            '--noise_level': 0.1
 
