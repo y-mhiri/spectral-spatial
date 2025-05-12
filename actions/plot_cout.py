@@ -10,67 +10,36 @@ sns.set_style('darkgrid')
 plt.rc('font', family='serif')
 
 def generate_latex_table(metrics, folder):
-    """Génère un tableau LaTeX des métriques brutes avec gestion robuste des valeurs"""
+    """Génère un tableau LaTeX des métriques brutes"""
     if not metrics:
         return
 
     # Trouver le nombre d'images
-    n_images = 1  # Par défaut, supposons 1 image
-    for metric_name, metric_values in metrics.items():
-        if isinstance(metric_values, (list, np.ndarray)):
-            if len(metric_values) > 0:
-                if isinstance(metric_values[0], (list, np.ndarray)):
-                    n_images = max(n_images, len(metric_values[0]))
-                else:
-                    n_images = max(n_images, len(metric_values))
+    n_images = max(len(v) if isinstance(v, (list, np.ndarray)) else 1 for v in metrics.values())
 
     # Créer le tableau LaTeX
     tex_path = os.path.join(folder, 'metrics_table.tex')
     with open(tex_path, 'w') as f:
-        # En-tête du tableau
         f.write("\\begin{tabular}{|c|" + "|".join(["c"]*len(metrics)) + "|}\n")
         f.write("\\hline\n")
         f.write("Image & " + " & ".join(metrics.keys()) + " \\\\\n")
         f.write("\\hline\n")
         
-        # Données pour chaque image
         for img_idx in range(n_images):
             row = [str(img_idx)]
-            for metric_name, metric_values in metrics.items():
-                val = None
-                
-                # Extraction de la valeur
-                if isinstance(metric_values, (list, np.ndarray)):
-                    if len(metric_values) > 0:
-                        if isinstance(metric_values[0], (list, np.ndarray)):
-                            if len(metric_values[0]) > img_idx:
-                                val = metric_values[0][img_idx]
-                        elif len(metric_values) > img_idx:
-                            val = metric_values[img_idx]
-                        elif len(metric_values) == 1:  # Cas spécial pour liste de longueur 1
-                            val = metric_values[0]
-                
-                # Conversion et formatage
-                if val is not None:
-                    try:
+            for metric_name, values in metrics.items():
+                try:
+                    val = values[img_idx] if isinstance(values, (list, np.ndarray)) and len(values) > img_idx else "-"
+                    if isinstance(val, (float, np.floating)):
                         if metric_name == 'PSNR':
-                            row.append(f"{float(val):.2f} dB")
+                            row.append(f"{val:.2f} dB")
                         elif metric_name == 'SAM':
-                            if isinstance(val, (float, int, np.number)):
-                                if np.isnan(val):
-                                    row.append("nan")
-                                else:
-                                    row.append(f"{float(val):.4f}")  # Valeur en radians sans conversion
-                            else:
-                                row.append("-")
-                        elif metric_name in ['CC', 'SSIM', 'RNMSE']:
-                            row.append(f"{float(val):.4f}")
+                            row.append(f"{val:.4f} rad")
                         else:
-                            row.append(f"{float(val):.4f}")
-                    except (TypeError, ValueError) as e:
-                        print(f"[yellow]Erreur conversion {metric_name}: {val} ({type(val)}) - {e}[/yellow]")
-                        row.append("-")
-                else:
+                            row.append(f"{val:.4f}")
+                    else:
+                        row.append(str(val))
+                except (IndexError, TypeError):
                     row.append("-")
             
             f.write(" & ".join(row) + " \\\\\n")
@@ -78,86 +47,119 @@ def generate_latex_table(metrics, folder):
         
         f.write("\\end{tabular}\n")
     
-    print(f"[bold green]Tableau LaTeX généré : {tex_path}")
+    print(f"[green]Tableau LaTeX généré : {tex_path}")
 
-def generate_figures(root, folder, save=True):
-    """Génère les figures de visualisation"""
-    # Figure 1: Courbe de convergence
-    if 'loss' in root:
-        fig1, ax1 = plt.subplots(1, 1, figsize=(6, 4))
-        loss_ar = root['loss'][:]
-        ax1.plot(loss_ar.T, label='Fonction de coût')
-        ax1.set_xlabel('Itérations')
-        ax1.set_ylabel('Fonction de coût')
-        ax1.set_title('Évolution de la fonction de coût')
-        ax1.set_yscale('log')
+def generate_metric_plots(metrics, folder):
+    """Génère un graphique séparé pour chaque métrique"""
+    if not metrics:
+        return
+
+    for metric_name, values in metrics.items():
+        if not isinstance(values, (list, np.ndarray)) or len(values) == 0:
+            continue
+
+        plt.figure(figsize=(8, 5))
         
-        if save:
-            plt.savefig(os.path.join(folder, 'cost_function.png'), bbox_inches='tight', dpi=300)
-            plt.close(fig1)
-        else:
-            plt.show()
-    
-    # Récupération des métriques
-    metrics = {}
-    for k, v in root.attrs.items():
-        if k not in ['lambda', 'lambda_m', 'p', 'q', 'r', 'time', 
-                    'noise_level', 'sigma', 'scale', 'seed',
-                    'data_idx', 'crop', 'crop_size', 'device']:
-            if isinstance(v, (list, np.ndarray)):
-                metrics[k] = v
-                print(f"[cyan]Métrique {k}: {v} (type: {type(v)})[/cyan]")
-                if isinstance(v, (list, np.ndarray)):
-                    print(f"  Premier élément: {v[0]} (type: {type(v[0])})")
-    
-    if metrics:
-        # Génère le tableau LaTeX
-        generate_latex_table(metrics, folder)
-        
-        # Figure 2: Comparaison des métriques
-        fig2, ax2 = plt.subplots(1, 1, figsize=(10, 6))
-        for metric_name, values in metrics.items():
-            if len(values) > 0:
-                if isinstance(values[0], (list, np.ndarray)):
-                    for i, sub_values in enumerate(values):
-                        ax2.plot(range(len(sub_values)), sub_values, marker='o', label=f'{metric_name}_{i}')
+        # Gestion des valeurs spéciales
+        clean_values = []
+        for v in values:
+            if isinstance(v, (float, int, np.number)):
+                if np.isnan(v):
+                    clean_values.append(0)  # Remplacer NaN si nécessaire
                 else:
-                    ax2.plot(range(len(values)), values, marker='o', label=metric_name)
+                    clean_values.append(v)
+            else:
+                clean_values.append(0)  # Valeur par défaut
+
+        # Tracé du graphique
+        x = range(len(clean_values))
+        plt.plot(x, clean_values, 'o-', markersize=8, linewidth=2)
         
-        ax2.set_xlabel('Index image')
-        ax2.set_ylabel('Valeur métrique')
-        ax2.set_title('Comparaison des métriques')
-        ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-        ax2.grid(True)
-        
-        if save:
-            plt.savefig(os.path.join(folder, 'metrics_comparison.png'), bbox_inches='tight', dpi=300)
-            plt.close(fig2)
+        # Configuration spécifique par métrique
+        if metric_name == 'PSNR':
+            plt.ylabel('dB')
+            plt.ylim(0, 100)  # Plage typique pour PSNR
+        elif metric_name == 'SAM':
+            plt.ylabel('Radians')
+            plt.ylim(0, 3.14)  # Plage 0-π
         else:
-            plt.tight_layout()
-            plt.show()
+            plt.ylabel('Valeur')
+
+        plt.xlabel('Index Image')
+        plt.title(f'Évolution de {metric_name}')
+        plt.grid(True)
+        
+        # Sauvegarde
+        filename = f"metric_{metric_name.lower().replace(' ', '_')}.png"
+        plt.savefig(os.path.join(folder, filename), bbox_inches='tight', dpi=300)
+        plt.close()
+        print(f"[green]Graphique généré : {filename}")
+
+def generate_loss_plot(loss_data, folder):
+    """Génère la courbe de convergence"""
+    if loss_data is None or len(loss_data) == 0:
+        return
+
+    plt.figure(figsize=(8, 5))
+    
+    # Tracé pour chaque image
+    for i, loss in enumerate(loss_data):
+        plt.plot(loss, label=f'Image {i}')
+    
+    plt.xlabel('Itérations')
+    plt.ylabel('Fonction de coût (échelle log)')
+    plt.title('Évolution de la fonction de coût')
+    plt.yscale('log')
+    plt.legend()
+    plt.grid(True)
+    
+    # Sauvegarde
+    plt.savefig(os.path.join(folder, 'cost_function.png'), bbox_inches='tight', dpi=300)
+    plt.close()
+    print("[green]Graphique de convergence généré")
+
+def analyze_results(zarr_path, output_folder):
+    """Analyse principale des résultats"""
+    try:
+        root = zarr.open(zarr_path, mode='r')
+        
+        # Création du dossier de sortie
+        os.makedirs(output_folder, exist_ok=True)
+        
+        # Extraction des métriques
+        metrics = {}
+        for k, v in root.attrs.items():
+            if k not in ['lambda', 'lambda_m', 'p', 'q', 'r', 'time']:
+                if isinstance(v, (list, np.ndarray)):
+                    metrics[k] = v
+        
+        # Génération des graphiques
+        if 'loss' in root:
+            generate_loss_plot(root['loss'][:], output_folder)
+        
+        if metrics:
+            generate_latex_table(metrics, output_folder)
+            generate_metric_plots(metrics, output_folder)
+        
+        return True
+    
+    except Exception as e:
+        print(f"[red]Erreur d'analyse : {str(e)}[/red]")
+        return False
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--storage_path', type=str, required=True,
-                       help='Chemin vers les résultats')
-    parser.add_argument('--group', type=int, 
-                       help='Numéro de groupe si applicable')
-    parser.add_argument('--save', action='store_true', default=True,
-                       help='Sauvegarder les résultats')
+    parser.add_argument('--storage_path', required=True, help='Chemin vers les résultats')
+    parser.add_argument('--group', type=int, help='Numéro de groupe')
     args = parser.parse_args()
 
-    print("[bold green]Début de l'analyse des résultats...[/bold green]")
-    folder = args.storage_path
-    if args.group:
-        folder = os.path.join(folder, f'group_{args.group}')
+    # Détermination des chemins
+    results_path = os.path.join(args.storage_path, f"group_{args.group}" if args.group else "", "results.zarr")
+    output_folder = os.path.join(args.storage_path, f"group_{args.group}" if args.group else "", "analysis")
 
-    fig_folder = os.path.join(folder, 'figures')
-    os.makedirs(fig_folder, exist_ok=True)
-
-    try:
-        root = zarr.open(f"{folder}/results.zarr", mode='r')
-        generate_figures(root, fig_folder, args.save)
-        print("[bold green]Analyse terminée avec succès![/bold green]")
-    except Exception as e:
-        print(f"[bold red]Erreur lors de l'analyse: {str(e)}[/bold red]")
+    print(f"[bold]Analyse des résultats : {results_path}")
+    
+    if analyze_results(results_path, output_folder):
+        print("[bold green]Analyse terminée avec succès!")
+    else:
+        print("[bold red]Échec de l'analyse")
