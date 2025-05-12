@@ -72,7 +72,7 @@ class TVPrior(ChambollePock):
     
 
 
-    def prox_sigma_g_conj(self, U, eps=1e-8):
+    def prox_sigma_g_conj(self, U,eps=1e-8):
         """
         Projection sur la boule duale l^{p*,q*,r*} <= 1.
         Gère explicitement p*, q*, r* = infinity.
