@@ -2,10 +2,10 @@ import argparse
 import os
 import numpy as np
 import zarr
-import glob
 import matplotlib.pyplot as plt
 import seaborn as sns
 from rich import print
+from glob import glob
 
 sns.set_style('darkgrid')
 plt.rc('font', family='serif')
@@ -25,7 +25,7 @@ def generate_latex_table(metrics, folder):
         f.write("\\hline\n")
         f.write("Image & " + " & ".join(metrics.keys()) + " \\\\\n")
         f.write("\\hline\n")
-
+        
         for img_idx in range(n_images):
             row = [str(img_idx)]
             for metric_name, values in metrics.items():
@@ -42,12 +42,12 @@ def generate_latex_table(metrics, folder):
                         row.append(str(val))
                 except (IndexError, TypeError):
                     row.append("-")
-
+            
             f.write(" & ".join(row) + " \\\\\n")
             f.write("\\hline\n")
-
+        
         f.write("\\end{tabular}\n")
-
+    
     print(f"[green]Tableau LaTeX généré : {tex_path}")
 
 def generate_metric_plots(metrics, folder):
@@ -60,36 +60,36 @@ def generate_metric_plots(metrics, folder):
             continue
 
         plt.figure(figsize=(8, 5))
-
+        
         # Gestion des valeurs spéciales
         clean_values = []
         for v in values:
             if isinstance(v, (float, int, np.number)):
                 if np.isnan(v):
-                    clean_values.append(0)  # Remplacer NaN si nécessaire
+                    clean_values.append(0)
                 else:
                     clean_values.append(v)
             else:
-                clean_values.append(0)  # Valeur par défaut
+                clean_values.append(0)
 
         # Tracé du graphique
         x = range(len(clean_values))
         plt.plot(x, clean_values, 'o-', markersize=8, linewidth=2)
-
+        
         # Configuration spécifique par métrique
         if metric_name == 'PSNR':
             plt.ylabel('dB')
-            plt.ylim(0, 100)  # Plage typique pour PSNR
+            plt.ylim(0, 100)
         elif metric_name == 'SAM':
             plt.ylabel('Radians')
-            plt.ylim(0, 3.14)  # Plage 0-π
+            plt.ylim(0, 3.14)
         else:
             plt.ylabel('Valeur')
 
         plt.xlabel('Index Image')
         plt.title(f'Évolution de {metric_name}')
         plt.grid(True)
-
+        
         # Sauvegarde
         filename = f"metric_{metric_name.lower().replace(' ', '_')}.png"
         plt.savefig(os.path.join(folder, filename), bbox_inches='tight', dpi=300)
@@ -102,116 +102,148 @@ def generate_loss_plot(loss_data, folder):
         return
 
     plt.figure(figsize=(8, 5))
-
-    # Tracé pour chaque image
+    
     for i, loss in enumerate(loss_data):
         plt.plot(loss, label=f'Image {i}')
-
+    
     plt.xlabel('Itérations')
     plt.ylabel('Fonction de coût (échelle log)')
     plt.title('Évolution de la fonction de coût')
     plt.yscale('log')
     plt.legend()
     plt.grid(True)
-
-    # Sauvegarde
+    
     plt.savefig(os.path.join(folder, 'cost_function.png'), bbox_inches='tight', dpi=300)
     plt.close()
     print("[green]Graphique de convergence généré")
+
+def compare_groups(storage_path, param_name):
+    """Compare les métriques entre groupes pour un paramètre donné"""
+    group_dirs = sorted(glob(os.path.join(storage_path, 'group_*')))
+    if not group_dirs:
+        print("[red]Aucun groupe trouvé pour comparaison[/red]")
+        return
+
+    # Récupération des données
+    all_metrics = {}
+    param_values = []
+    
+    for group_dir in group_dirs:
+        try:
+            root = zarr.open(os.path.join(group_dir, 'results.zarr'), mode='r')
+            params = dict(root.attrs)
+            
+            # Valeur du paramètre pour ce groupe
+            param_value = params.get(param_name)
+            if param_value is None:
+                print(f"[yellow]Paramètre {param_name} non trouvé dans {group_dir}[/yellow]")
+                continue
+            
+            param_values.append(param_value)
+            
+            # Récupération des métriques moyennes
+            for metric_name in params:
+                if metric_name not in ['lambda', 'lambda_m', 'p', 'q', 'r', 'time', 
+                                      'noise_level', 'sigma', 'scale', 'seed',
+                                      'data_idx', 'crop', 'crop_size', 'device']:
+                    metric_value = params[metric_name]
+                    if isinstance(metric_value, (list, np.ndarray)):
+                        all_metrics.setdefault(metric_name, []).append(np.mean(metric_value))
+        except Exception as e:
+            print(f"[red]Erreur lecture {group_dir}: {str(e)}[/red]")
+
+    if not param_values:
+        return
+
+    # Création des graphiques
+    output_dir = os.path.join(storage_path, 'comparison')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    for metric_name, values in all_metrics.items():
+        if len(values) != len(param_values):
+            continue
+            
+        plt.figure(figsize=(10, 6))
+        
+        # Tri des valeurs selon le paramètre
+        sorted_indices = np.argsort(param_values)
+        x = np.array(param_values)[sorted_indices]
+        y = np.array(values)[sorted_indices]
+        
+        plt.plot(x, y, 'o-', markersize=8, linewidth=2)
+        plt.xlabel(param_name)
+        plt.ylabel(metric_name)
+        plt.title(f'{metric_name} vs {param_name}')
+        plt.grid(True)
+        
+        if param_name == 'noise_level':
+            plt.xscale('log')
+        
+        filename = f"compare_{param_name}_{metric_name.lower()}.png"
+        plt.savefig(os.path.join(output_dir, filename), bbox_inches='tight', dpi=300)
+        plt.close()
+        print(f"[green]Graphique de comparaison généré : {filename}")
 
 def analyze_results(zarr_path, output_folder):
     """Analyse principale des résultats"""
     try:
         root = zarr.open(zarr_path, mode='r')
-
-        # Création du dossier de sortie
         os.makedirs(output_folder, exist_ok=True)
-
+        
         # Extraction des métriques
         metrics = {}
         for k, v in root.attrs.items():
             if k not in ['lambda', 'lambda_m', 'p', 'q', 'r', 'time']:
                 if isinstance(v, (list, np.ndarray)):
                     metrics[k] = v
-
+        
         # Génération des graphiques
         if 'loss' in root:
             generate_loss_plot(root['loss'][:], output_folder)
-
+        
         if metrics:
             generate_latex_table(metrics, output_folder)
             generate_metric_plots(metrics, output_folder)
-
+        
         return True
-
+    
     except Exception as e:
         print(f"[red]Erreur d'analyse : {str(e)}[/red]")
         return False
 
-def organize_data(file_paths, group_param):
-    metrics_data = {}
-    for file_path in file_paths:
-        root = zarr.open(file_path, mode='r')
-        data = {}
-        for key in root.attrs:
-            data[key] = root.attrs[key]
-
-        group_value = data[group_param]
-        if group_value not in metrics_data:
-            metrics_data[group_value] = []
-        metrics_data[group_value].append({
-            'CC': data['CC'][0],
-            'PSNR': data['PSNR'][0],
-            'RNMSE': data['RNMSE'][0],
-            'SAM': data['SAM'][0],
-            'SSIM': data['SSIM'][0][0],
-            'time': data['time']
-        })
-    return metrics_data
-
-def plot_metrics(metrics_data, group_param, output_folder):
-    group_values = sorted(metrics_data.keys())
-    metrics_names = ['CC', 'PSNR', 'RNMSE', 'SAM', 'SSIM', 'time']
-
-    for metric_name in metrics_names:
-        plt.figure()
-        metric_values = [sum([data[metric_name] for data in metrics_data[group_value]]) / len(metrics_data[group_value]) for group_value in group_values]
-        plt.plot(group_values, metric_values, 'o-', label=metric_name)
-        plt.xlabel(group_param)
-        plt.ylabel(metric_name)
-        plt.title(f'{metric_name} vs {group_param}')
-        plt.legend()
-        plt.grid(True)
-
-        # Sauvegarde du graphique
-        filename = f"{metric_name.lower()}_vs_{group_param.lower()}.png"
-        plt.savefig(os.path.join(output_folder, filename), bbox_inches='tight', dpi=300)
-        plt.close()
-        print(f"Graphique généré : {filename}")
-
-def main():
-    parser = argparse.ArgumentParser(description='Analyse des métriques en fonction des paramètres de groupe.')
-    parser.add_argument('--run_path', required=True, help='Chemin vers le dossier des runs')
-    parser.add_argument('--run_num', type=int, required=True, help='Numéro du run à analyser')
-    parser.add_argument('--group_param', required=True, help='Paramètre de groupe à analyser (e.g., noise_level, lambda, etc.)')
-    parser.add_argument('--output_folder', required=True, help='Dossier de sortie pour les graphiques')
-
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--storage_path', required=True, help='Chemin vers les résultats')
+    parser.add_argument('--group', type=int, help='Numéro de groupe spécifique')
+    parser.add_argument('--all_groups', action='store_true', help='Analyser tous les groupes')
+    parser.add_argument('--compare', type=str, help='Paramètre à comparer (noise_level, scale, etc.)')
     args = parser.parse_args()
 
-    # Chemin vers les fichiers .zarr du run spécifié
-    run_path = os.path.join(args.run_path, f"run_{args.run_num}")
-    group_paths = glob.glob(os.path.join(run_path, 'group_*'))
-
-    for group_path in group_paths:
-        file_paths = glob.glob(os.path.join(group_path, '*.zarr'))
-        group_name = os.path.basename(group_path)
-        group_output_folder = os.path.join(args.output_folder, group_name)
-
-        # Organiser les données par groupe
-        metrics_data = organize_data(file_paths, args.group_param)
-
-        # Tracer les métriques
-        plot_metrics(metrics_data, args.group_param, group_output_folder)
-
-if __name__ == "__main__":
-    main()
+    if args.compare:
+        # Mode comparaison entre groupes
+        print(f"[bold]Comparaison des groupes pour {args.compare}...")
+        compare_groups(args.storage_path, args.compare)
+    elif args.all_groups:
+        # Analyse de tous les groupes
+        group_dirs = glob(os.path.join(args.storage_path, 'group_*'))
+        for group_dir in group_dirs:
+            group_num = os.path.basename(group_dir).split('_')[1]
+            print(f"\n[bold]Analyse du groupe {group_num}...")
+            
+            results_path = os.path.join(group_dir, "results.zarr")
+            output_folder = os.path.join(group_dir, "analysis")
+            
+            if analyze_results(results_path, output_folder):
+                print(f"[green]Groupe {group_num} analysé avec succès!")
+            else:
+                print(f"[red]Échec analyse groupe {group_num}")
+    else:
+        # Analyse d'un groupe spécifique ou du dossier principal
+        results_path = os.path.join(args.storage_path, f"group_{args.group}" if args.group else "", "results.zarr")
+        output_folder = os.path.join(args.storage_path, f"group_{args.group}" if args.group else "", "analysis")
+        
+        print(f"[bold]Analyse des résultats : {results_path}")
+        if analyze_results(results_path, output_folder):
+            print("[bold green]Analyse terminée avec succès!")
+        else:
+            print("[bold red]Échec de l'analyse")
