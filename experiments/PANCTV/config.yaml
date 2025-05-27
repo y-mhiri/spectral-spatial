@@ -8,11 +8,11 @@ datasets:
 actions:
   - plot:
       name: plot_cost
-      executable: actions/plot_cout.py
+      executable: actions/plot_groups.py
       executable_command: python
       description: Plot cost function of optimization algorithms.
   - show_hsi:
       name: show_hsi
       executable: actions/show_hsi.py
-      executable_command: python
+      executable_command: python/home/ndiayem/Documents/spectral-spatial/actions/run_7/group_3/results.zarr/loss/.zarray
       description: Save figures of hyperspectral images.
