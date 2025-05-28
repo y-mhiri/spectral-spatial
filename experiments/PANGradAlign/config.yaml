@@ -1,7 +1,7 @@
-name: PANCTV
-description: Benchmark ...
-path: experiments/PANCTV
-executable: experiments/PANCTV/experiment_ctv.py
+name: PANGradAlign
+description: 
+path: experiments/PANGradAlign
+executable: experiments/PANGradAlign/experiment_ctv_grad_alig.py
 executable_command: python
 datasets:
   - harvard
@@ -13,6 +13,6 @@ actions:
       description: Plot cost function of optimization algorithms.
   - show_hsi:
       name: show_hsi
-      executable: actions/show_hsi.py
-      executable_command: python/home/ndiayem/Documents/spectral-spatial/actions/run_7/group_3/results.zarr/loss/.zarray
+      executable: actions/show_hsi_gr.py
+      executable_command: python
       description: Save figures of hyperspectral images.
