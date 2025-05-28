@@ -1,7 +1,7 @@
 import sys
 import os 
 
-path = os.path.join(os.getenv("$HOME"), 'spectral-spatial/src')
+path = os.path.join(os.getenv("HOME"), 'spectral-spatial/src')
 sys.path.append(os.path.join(path, 'datasets'))
 sys.path.append(os.path.join(path, 'algorithms'))
 sys.path.append(os.path.join(path, 'metrics'))
