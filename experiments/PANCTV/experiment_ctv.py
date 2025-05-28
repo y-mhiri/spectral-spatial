@@ -1,7 +1,7 @@
 import sys
 import os 
 
-path = '/home/ndiayem/Documents/spectral-spatial/src'
+path = os.path.join(os.getenv("$HOME"), 'spectral-spatial/src')
 sys.path.append(os.path.join(path, 'datasets'))
 sys.path.append(os.path.join(path, 'algorithms'))
 sys.path.append(os.path.join(path, 'metrics'))
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     parser.add_argument("--dtype", type=str, default="float32")
 
     parser.add_argument("--storage_path", type=str, required=True)
-    parser.add_argument("--dataset_path", type=str, default="/home/ndiayem/Documents/spectral-spatial/data/harvard.zarr")
+    parser.add_argument("--dataset_path", type=str, required=True)
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_iter", type=int, default=100)
