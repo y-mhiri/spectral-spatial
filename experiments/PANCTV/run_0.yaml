@@ -10,11 +10,11 @@ fixed_args:
     '--image_idx': [6, 17]
     '--crop_center': True
     '--crop_size': 256
-    '--lmbda': 0.1
+    '--lmbda': 1e-2
     '--lmbda_m': 2
     '--tau': 0.1
-    '--p': 1
-    '--q': 1
+    '--p': 2
+    '--q': 2
     '--r': 1
     '--sigma': 0.1
     '--scale': 4

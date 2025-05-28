@@ -4,23 +4,20 @@ fixed_args:
     '--cuda_avail': True
     '--dtype': 'float32'
     '--seed': 42
-    '--max_iter': 1000
+    '--max_iter': 1
+    '--max_iter_gp': 1
     '--tol': 1e-12
     '--image_idx': [6, 17]
     '--crop_center': True
     '--crop_size': 256
-    '--lmbda': 0.01
-    '--lmbda_m': 2
+    '--lmbda': 1e-2
     '--tau': 0.1
     '--p': 2
     '--q': 2
-    '--r': 
+    '--r': 1
+    '--noise_level': 0.001
     '--sigma': 0.1
     '--scale': 4
-    '-- muette': 1e-12
-    '-- tresh': 0.03
-    '-- epsilon': 1e-12
-    '-- weight_type': 'hard'
 
 
 
@@ -28,11 +25,10 @@ varying_args:
 
     groups: 
         - options: 
-            '--noise_level': 0.0001
+            '--lmbda_m': 1
         - options: 
-            '--noise_level': 0.001
+            '--lmbda_m': 2
         - options: 
-            '--noise_level': 0.01
+            '--lmbda_m': 5
         - options: 
-            '--noise_level': 0.1
-
+            '--lmbda_m': 10

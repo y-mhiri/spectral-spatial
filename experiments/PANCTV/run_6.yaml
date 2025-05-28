@@ -1,0 +1,47 @@
+fixed_args:
+  options:
+    '--device': 'cpu'
+    '--cuda_avail': True
+    '--dtype': 'float32'
+    '--seed': 42
+    '--max_iter': 1
+    '--max_iter_gp': 1
+    '--tol': 1e-12
+    '--image_idx': [6, 17]
+    '--crop_center': True
+    '--crop_size': 256
+    '--lmbda': 1e-2
+    '--lmbda_m': 2
+    '--tau': 0.1
+    '--p': 2
+    '--q': 2
+    '--r': 1
+    '--noise_level': 0.001
+    '--sigma': 0.1
+    '--scale': 4
+
+
+
+varying_args:
+
+    groups: 
+        - options: 
+            '--tau': 0.01
+        - options: 
+            '--tau': 0.02
+        - options: 
+            '--tau': 0.04
+        - options: 
+            '--tau': 0.06
+        - options: 
+            '--tau': 0.08
+        - options: 
+            '--tau': 0.1
+        - options: 
+            '--tau': 0.2
+        - options: 
+            '--tau': 0.4
+        - options: 
+            '--tau': 0.6
+        - options: 
+            '--tau': 0.8
