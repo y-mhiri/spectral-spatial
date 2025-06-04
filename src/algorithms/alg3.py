@@ -1,7 +1,7 @@
 import torch
 from nabla import nabla
 from pan_gradient_prox import PANProximalGradient
-from tv_grad_alignementpqr import TVGradAlignement
+from tv_grad import TVGradAlignment
 
 class PANTVGradAlignement(PANProximalGradient):
     """
@@ -21,7 +21,7 @@ class PANTVGradAlignement(PANProximalGradient):
         params['q'] = self.q
         params['r'] = self.r
 
-        self.optim = TVGradAlignement(**params)
+        self.optim = TVGradAlignment(**params)
         # Assurez-vous que W est initialisé
         self.W = self.optim.W
 
