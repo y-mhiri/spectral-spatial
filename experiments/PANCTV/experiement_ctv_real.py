@@ -1,10 +1,10 @@
 import sys
 import os 
 
-path = "/home/ndiayem/Documents/spectral-spatial/src"
-sys.path.append(f'{path}/algorithms')
-sys.path.append(f'{path}/datasets')
-sys.path.append(f'{path}/metrics')
+path = '/home/ndiayem/Documents/spectral-spatial/src'
+sys.path.append(os.path.join(path, 'datasets'))
+sys.path.append(os.path.join(path, 'algorithms'))
+sys.path.append(os.path.join(path, 'metrics'))
 
 print(sys.path)
 import argparse
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     parser.add_argument("--dtype", type=str, default="float32")
 
     parser.add_argument("--storage_path", type=str, required=True)
-    parser.add_argument("--dataset_path", type=str, required=True)
+    parser.add_argument("--dataset_path", type=str, default="/home/ndiayem/Documents/spectral-spatial/data/harvard.zarr")
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_iter", type=int, default=100)
@@ -142,9 +142,9 @@ if __name__ == "__main__":
     
     crop_transform = transforms.Compose([transforms.CenterCrop(crop_size)])
     if crop:
-        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma/(crop_size**2),sigma1 = noise_level/(crop_size**2),device=device,size=crop_size,seed =seed)
+        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=crop_size,seed =seed)
     else:
-        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=None,normalize=True,scale= scale,sigma= sigma/(crop_size**2),sigma1 = noise_level/(crop_size**2),device=device,size=None,seed =seed)
+        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=None,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=None,seed =seed)
 
     subset = torch.utils.data.Subset(dataset, data_idx)
 

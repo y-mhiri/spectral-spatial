@@ -38,12 +38,16 @@ def generate_latex_table(metrics, folder):
     print(f"[green]Tableau LaTeX généré : {tex_path}")
 
 def generate_loss_plot(loss_data, folder):
-    """Génère la courbe de convergence."""
+    """Génère la courbe de convergence"""
     if loss_data is None or len(loss_data) == 0:
         return
 
     plt.figure(figsize=(8, 5))
-    plt.plot(loss_data, label='Fonction de coût')
+    
+    # Tracé pour chaque image
+    for i, loss in enumerate(loss_data):
+        plt.plot(loss, label=f'Image {i}')
+    
     plt.xlabel('Itérations')
     plt.ylabel('Fonction de coût (échelle log)')
     plt.title('Évolution de la fonction de coût')
@@ -51,9 +55,11 @@ def generate_loss_plot(loss_data, folder):
     plt.legend()
     plt.grid(True)
     
+    # Sauvegarde
     plt.savefig(os.path.join(folder, 'cost_function.png'), bbox_inches='tight', dpi=300)
     plt.close()
     print("[green]Graphique de convergence généré")
+
 
 def compare_groups(storage_path, param_name):
     """Compare les métriques entre groupes pour un paramètre donné."""

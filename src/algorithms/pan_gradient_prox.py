@@ -1,8 +1,10 @@
 import sys
 import torch
+import logging
 import torch.nn as nn
 from tqdm.auto import tqdm
 from nabla import nabla
+from datetime import datetime
 
 sys.path.append('src/datasets')
 sys.path.append('src/algorithms')
@@ -38,6 +40,17 @@ class PANProximalGradient(nn.Module):
         self.p = p
         self.q = q 
         self.r = r
+
+
+
+
+        # Configuration du logger simple vers stdout
+        self.logger = logging.getLogger('PANProximalGradient')
+        self.logger.setLevel(logging.INFO)
+        ch = logging.StreamHandler(sys.stdout)
+        ch.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        self.logger.addHandler(ch)
+
     
 
 
@@ -165,12 +178,13 @@ class PANProximalGradient(nn.Module):
             tuple: (Image estimée [b,c,h,w], historique des coûts)
         """
         U = self.Aadj(Y_H).clone()
+        #U = torch.zeros_like(self.Aadj(Y_H)) 
         cost_history = []
         
-        if self.verbose:
-            print("\nDébut de l'optimisation:")
-            print(f"{'It':<5} | {'Coût total':<12} | {'Data H':<12} | {'Data M':<12} | {'TV':<12} | {'ΔU':<12}")
-            print("-" * 80)
+        # En-tête du tableau
+        self.logger.info("\nDébut de l'optimisation:")
+        self.logger.info(f"{'It':<5} | {'Coût total':<12} | {'Data H':<12} | {'Data M':<12} | {'TV':<12} | {'ΔU':<12}")
+        self.logger.info("-" * 80)
         
         cost_history = torch.zeros(self.max_iter)
         for it in range(self.max_iter):
@@ -186,13 +200,13 @@ class PANProximalGradient(nn.Module):
             cost_history[it] = total_cost.item()
             
             # Affichage conditionnel
-            if self.verbose and (it % 10 == 0 or it == self.max_iter - 1 or delta_U < self.tol):
-                
-                print(f"{it:<5} | {total_cost.item():<12.3e} | {data_term_h.item():<12.3e} | "
-                      f"{data_term_m.item():<12.3e} | {tv_term.item():<12.3e} | {delta_U:<12.3e}")
+            if it % 10 == 0 or it == self.max_iter - 1 or delta_U < self.tol:
+                log_message = (f"{it:<5} | {total_cost.item():<12.3e} | {data_term_h.item():<12.3e} | "
+                             f"{data_term_m.item():<12.3e} | {tv_term.item():<12.3e} | {delta_U:<12.3e}")
+                self.logger.info(log_message)
                 
                 if delta_U < self.tol:
-                    print(f"\nConvergence atteinte à l'itération {it} (ΔU = {delta_U:.3e} < {self.tol})")
+                    self.logger.info(f"\nConvergence atteinte à l'itération {it} (ΔU = {delta_U:.3e} < {self.tol})")
                     break
         
         return U, cost_history

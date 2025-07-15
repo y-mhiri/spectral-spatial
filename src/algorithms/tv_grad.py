@@ -1,5 +1,9 @@
 import torch
-from torch.linalg import norm
+
+from chambolle_pock import ChambollePock
+from math import sqrt
+from torch.linalg import svd, norm
+from nabla import nabla, nabla_adjoint
 from torch.nn.functional import sigmoid
 
 
@@ -12,18 +16,15 @@ class GradientWeights:
     def hard_threshold(epsilon=1e-7):
         """Hard thresholding weight function"""
         def weight_fn(c, alpha):
-            w1 = torch.ones_like(c)
-            w2 = torch.where(c < alpha, torch.ones_like(c), epsilon * torch.ones_like(c))
-            return torch.stack((w1, w2), dim=-1).transpose(4, 5).squeeze(-1)
+            return torch.stack((torch.ones_like(c),torch.where(c < alpha, torch.ones_like(c), torch.ones_like(c) * epsilon)
+    ), dim=-1).transpose(-2, -1)
         return weight_fn
 
     @staticmethod
     def soft_threshold(tau=1.0):
         """Soft thresholding with sigmoid transition"""
         def weight_fn(c, alpha):
-            w1 = torch.ones_like(c)
-            w2 = sigmoid(tau * (c - alpha))
-            return torch.stack((w1, w2), dim=-1).transpose(4, 5).squeeze(-1)
+            return torch.stack((torch.ones_like(c),sigmoid(tau * (c - alpha))), dim=-1).transpose(-2, -1)
         return weight_fn
 
 
@@ -62,23 +63,20 @@ class TVGradAlignment(ChambollePock):
     def _compute_weights(self, grad_panc):
         """Compute the weight matrix from panchromatic gradients"""
         # Create orthogonal gradients
-        grad_orth = torch.stack([grad_panc[..., 1], -grad_panc[..., 0]], dim=-1)
-        grad_norms = norm(grad_panc, dim=-1, keepdim=True) + 1e-7
-        
-        # Normalize gradients
-        grad_parallel = grad_panc / grad_norms
-        grad_orth = grad_orth / grad_norms
-        
-        # Stack gradients (orthogonal first, then parallel)
-        grads = torch.stack([grad_orth, grad_parallel], dim=-1).transpose(-2, -1)
+        grad_panc_orth = torch.zeros_like(grad_panc).to(grad_panc.device).type(grad_panc.dtype)
+        grad_panc_orth[...,0] = grad_panc[...,1]
+        grad_panc_orth[...,1] = -grad_panc[...,0]
+        norm_grad_panc = norm(grad_panc, dim=-1, keepdim=True) 
+
+        grads = torch.stack((grad_panc_orth/(norm_grad_panc + 1e-7), grad_panc/(norm_grad_panc+ 1e-7)), dim=-1).transpose(-2,-1)
         
         # Compute weights using selected strategy
-        weights = self.weight_fun(grad_norms, self.alpha)
+        c = norm_grad_panc
+        weights = self.weight_fun(c,self.alpha)
         
         # Normalize weights
         weights_sum = torch.sum(weights, dim=-1, keepdim=True)
-        weights = weights / (weights_sum + 1e-7)
-        
+        weights = weights / (weights_sum + 1e-7) 
         return weights * grads
 
     def compute_L(self, nband):

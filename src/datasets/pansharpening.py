@@ -31,7 +31,7 @@ class PANDataset(data.Dataset):
     """
 
     def __init__(self, root_dir, split='train', transform=None, normalize=False, 
-                 scale=4, sigma=1.0,sigma1 = 0.01, device="cpu", size=None, seed=0):
+                 scale=4, sigma=0.001,sigma1 = 0.001, device="cpu", size=None, seed=0):
         """
         Args:
             root_dir (str): Chemin vers le fichier Zarr

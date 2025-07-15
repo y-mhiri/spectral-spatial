@@ -4,40 +4,78 @@ from chambolle_pock import ChambollePock
 from math import sqrt
 from torch.linalg import svd, norm
 from nabla import nabla, nabla_adjoint
+from torch.nn.functional import sigmoid
 
 
-class TVGradAlignement(ChambollePock):
+class GradientWeights:
+    """
+    Factory class to create weight functions for TVGradAlignment
+    Supports both hard and soft thresholding strategies
+    """
+    @staticmethod
+    def hard_threshold(epsilon=1e-7):
+        """Hard thresholding weight function"""
+        def weight_fn(c, alpha):
+            return torch.stack((torch.ones_like(c),torch.where(c < alpha, torch.ones_like(c), torch.ones_like(c) * epsilon)
+    ), dim=-1).transpose(-2, -1)
+        return weight_fn
 
-    def __init__(self, grad_panc,p,q,r,thresh=0, muette=1e-7, weight_fun=None,*args, **kwargs):
-        super(TVGradAlignement, self).__init__(*args, **kwargs)
+    @staticmethod
+    def soft_threshold(tau=1.0):
+        """Soft thresholding with sigmoid transition"""
+        def weight_fn(c, alpha):
+            return torch.stack((torch.ones_like(c),sigmoid((c - alpha)/tau)), dim=-1).transpose(-2, -1)
+        return weight_fn
 
-        if weight_fun is None:
-            self.weight_fun = lambda c, mu: torch.stack((2 - torch.exp(-mu*c), torch.exp(-mu*c)), dim=-1).transpose(4,5).squeeze(-1)
+
+class TVGradAlignment(ChambollePock):
+    def __init__(self, grad_panc, p, q, r, 
+                 threshold_type='soft',  # 'soft' or 'hard'
+                 alpha=0.1,             # threshold value
+                 threshold_param=1.0,   # epsilon (hard) or tau (soft)
+                 *args, **kwargs):
+        """
+        Args:
+            grad_panc: Panchromatic image gradients
+            p, q, r: Norm parameters
+            threshold_type: 'soft' or 'hard' thresholding strategy
+            alpha: Threshold value
+            threshold_param: epsilon (for hard) or tau (for soft)
+        """
+        super().__init__(*args, **kwargs)
+
+        # Select weight function based on threshold type
+        if threshold_type == 'hard':
+            self.weight_fun = GradientWeights.hard_threshold(epsilon=threshold_param)
+        elif threshold_type == 'soft':
+            self.weight_fun = GradientWeights.soft_threshold(tau=threshold_param)
         else:
-            self.weight_fun = weight_fun # weight_fun should return weights of size [batch, channel, height, width, 2]
+            raise ValueError("threshold_type must be 'hard' or 'soft'")
 
-        self.W = self.weight(grad_panc, thresh=thresh ,muette =muette)
+        # Normalize alpha relative to gradient magnitudes
+        self.alpha = alpha / (torch.mean(norm(grad_panc, dim=-1)) + 1e-7)        
+        self.W = self._compute_weights(grad_panc)
         self.p = p
         self.q = q
-        self.r = r 
+        self.r = r
 
-    def compute_L(self, nband):
-        return sqrt(8)*self.lmbda*nband #sqrt(band)?
-    
-
-
-    def weight(self,grad_panc, thresh,muette):
-
+    def _compute_weights(self, grad_panc):
+        """Compute the weight matrix from panchromatic gradients"""
+        # Create orthogonal gradients
         grad_panc_orth = torch.zeros_like(grad_panc).to(grad_panc.device).type(grad_panc.dtype)
         grad_panc_orth[...,0] = grad_panc[...,1]
         grad_panc_orth[...,1] = -grad_panc[...,0]
         norm_grad_panc = norm(grad_panc, dim=-1, keepdim=True) 
 
         grads = torch.stack((grad_panc_orth/(norm_grad_panc + 1e-7), grad_panc/(norm_grad_panc+ 1e-7)), dim=-1).transpose(-2,-1)
-        c = norm_grad_panc / (torch.mean(norm(grad_panc, ord=2, dim=-1)) + 1e-7)
-        weights = self.weight_fun(c, thresh,muette) 
-        return (weights*grads)
 
+        weights = self.weight_fun(norm_grad_panc, self.alpha)
+        # Normalize weights
+        return weights * grads
+
+    def compute_L(self, nband):
+        return sqrt(8)*self.lmbda*nband #sqrt(band)?
+    
     def K(self, u, **kwargs):
         """
             Define the linear operator associated to the primal dual formulation of the problem
@@ -129,18 +167,3 @@ class TVGradAlignement(ChambollePock):
         reg = lambda p: lmbda*torch.sum(norm(torch.matmul(self.W,nabla(p).unsqueeze(-1)).squeeze(-1),dim=-1))#.squeeze(-1), dim=-1)
 
         return f(u) + reg(u)
-    
-
-    def hsi_viz(x):
-
-        x_mat = x.reshape(x.shape[1], -1)
-
-        U, s, V = svd(x_mat, full_matrices=False)
-        
-
-        Z_mat = torch.diag(s) @ V
-        Z = Z_mat.reshape(x.shape)
-
-        return Z, s 
-
-    

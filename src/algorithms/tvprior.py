@@ -78,6 +78,10 @@ class TVPrior(ChambollePock):
         Gère explicitement p*, q*, r* = infinity.
         """
 
+        print(self.p)
+        print(self.q)
+        print(self.r)
+
         def get_dual_exponent(val):
             if val == 1:
                 return torch.inf
@@ -109,19 +113,50 @@ class TVPrior(ChambollePock):
 
         # Scaling pour respecter ||U||_{p*,q*,r*} <= 1
         scaling = torch.maximum(torch.tensor(1.0, device=U.device), norm_r_star)
-        return U / (scaling + eps)
+        return (U / (scaling + eps))
     
+    
+    def ctv_norm(self, U,eps=1e-8):
+        """
+        Calcule la norme CTV l^p,q,r avec support pour p,q,r = infini.
+        
+        Args:
+            U (torch.Tensor): Tenseur de gradients [b,c,h,w,2]
+            p, q, r (float or torch.inf): Exposants de la norme
+            eps (float): Petite valeur pour stabilité numérique
+            
+        Returns:
+            torch.Tensor: Norme CTV [b,1,1,1]
+        """
+        # Norme p sur les canaux (axis=1)
+        if torch.isinf(torch.tensor(self.p)):
+            norm_p = torch.amax(torch.abs(U), dim=1, keepdim=True)  # l^infini
+        else:
+            norm_p = torch.sum(torch.abs(U)**self.p, dim=1, keepdim=True)**(1/(self.p + eps))
+
+        # Norme q sur les dérivées (axis=-1)
+        if torch.isinf(torch.tensor(self.q)):
+            norm_q = torch.amax(torch.abs(norm_p), dim=-1, keepdim=True)  # l^infini
+        else:
+            norm_q = torch.sum(norm_p**self.q, dim=-1, keepdim=True)**(1/(self.q + eps))
+
+        # Norme r sur les pixels (axis=(2,3))
+        if torch.isinf(torch.tensor(self.r)):
+            norm_r = torch.amax(torch.abs(norm_q), dim=(2,3), keepdim=True)  # l^infini
+        else:
+            norm_r = torch.sum(norm_q**self.r, dim=(2,3), keepdim=True)**(1/(self.r + eps))
+
+        return norm_r
         
 
     def loss_fn(self, u, y, lmbda):
-        r"""
-        Compute the loss function of the problem
-        """
-        f = lambda u: 0.5*torch.norm(u - y)**2
-        reg = lambda u: lmbda*torch.sum(
-                                torch.norm(nabla(u), dim=-1)
-                                )
-        return f(u) + reg(u)
+        # Terme de fidélité aux données (L2)
+        data_fidelity = 0.5 * torch.norm(u - y)**2
+        # Terme de régularisation CTV (utilisant p, q, r)
+        grad_u = nabla(u)  # [b,c,h,w,2]
+        ctv = self.ctv_norm(grad_u)  # Utilisez votre implémentation de la norme CTV
+        
+        return data_fidelity + lmbda * ctv
     
 
 

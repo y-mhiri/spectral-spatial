@@ -3,7 +3,7 @@ from nabla import nabla
 from pan_gradient_prox import PANProximalGradient
 from tv_grad import TVGradAlignment
 
-class PANTVGradAlignement(PANProximalGradient):
+class PANTVGradAlignment(PANProximalGradient):
     """
     Calcul de l'opérateur proximale de la TV vectorielle en utilisant chamboll pock.
     Attributs:

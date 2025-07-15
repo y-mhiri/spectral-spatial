@@ -15,7 +15,7 @@ import time
 import matplotlib.pyplot as plt
 from pansharpening import PANDataset
 from nabla import nabla
-from alg3 import PANTVGradAlignement
+from alg3 import PANTVGradAlignment
 from torchvision import transforms
 from math import sqrt
 import yaml
@@ -25,20 +25,6 @@ from metrics import compute_metrics
 
 from torchvision import transforms
 
-
-# Définition des fonctions weight
-def hard_threshold(c, alpha, epsilon):
-    return torch.stack((
-        torch.ones_like(c),
-        torch.where(c < alpha, torch.ones_like(c), torch.ones_like(c) * epsilon)
-    ), dim=-1).transpose(-2, -1)
-
-def soft_threshold(c, alpha, tau):
-    sigmoid = lambda x: 1 / (1 + torch.exp(-x))
-    return torch.stack((
-        torch.ones_like(c),
-        sigmoid(tau * (c - alpha))
-    ), dim=-1).transpose(-2, -1)
 
 if __name__ == "__main__":
 
@@ -53,8 +39,12 @@ if __name__ == "__main__":
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_iter", type=int, default=100)
-    
-
+    parser.add_argument("--max_iter_cp", type=int, default=100)
+    parser.add_argument("--sigma_cp", type=float, default=2.0)
+    parser.add_argument("--theta_cp", type=float, default=1.0)
+    parser.add_argument("--threshold_type", type=str, default="hard", choices=["hard", "soft"])
+    parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--threshold_param", type=float, default=1e-7)
     parser.add_argument("--tol", type=float, default=1e-12)
 
     parser.add_argument("--image_idx", nargs="+", type=int, default=[6, 17])
@@ -69,17 +59,10 @@ if __name__ == "__main__":
     parser.add_argument("--noise_level",type=float, required=True)
     parser.add_argument("--sigma",type=float, required=True)
     parser.add_argument("--scale",type=int, required=True)
-    parser.add_argument("--thresh", type=float, required=True, help="Seuil alpha pour la fonction weight_fun")
-    parser.add_argument("--muette", type=float, required=True, help="valeur de epsilon ou valeur de tau")
-    
-    # Nouveaux arguments pour weight_fun
-    parser.add_argument("--weight_type", type=str, default="hard",
-                       choices=["hard", "soft"],
-                       help="Type de fonction weight: hard (thresholding) ou soft (sigmoid)")
-    parser.add_argument("--epsilon", type=float, default=1e-7,
-                       help="Valeur epsilon pour hard thresholding (uniquement pour weight_type=hard)")
-    parser.add_argument("--tau", type=float, default=10.0,
-                       help="Paramètre tau pour soft thresholding (uniquement pour weight_type=soft)")
+
+
+
+
     args = parser.parse_args()
 
     print(f"I am a run. Everything done here will be save to {args.storage_path}.")
@@ -114,29 +97,24 @@ if __name__ == "__main__":
     out_path = args.storage_path
 
     dataset_name = data_path.split('/')[-1].split('.')[0]
-    algorithm = 'PANGradAlign'
+    algorithm = 'PANCTV'
 
     # Choose subset of data
     data_idx = args.image_idx # [6, 17]#  6,42,8,43]
     crop = args.crop_center 
     crop_size = args.crop_size 
+    # Noise level
     noise_level = args.noise_level
     sigma = args.sigma
     scale = args.scale
-    
+
+      
 
     # CTV hyperparameters
 
     ## global
     max_iter = args.max_iter
     tol = args.tol
-    thresh = args.thresh
-    muette = args.muette
-    weight_type = args.weight_type
-    epsilon = args.epsilon
-    tau = args.tau
-
-
 
     ## lambda_tv ,lambda_m , p , q et r
     lmbda = args.lmbda
@@ -144,6 +122,17 @@ if __name__ == "__main__":
     p = args.p
     q = args.q 
     r = args.r
+
+
+    # CP params
+
+    sigma_cp = args.sigma_cp
+    theta_cp  = args.theta_cp
+    max_iter_cp = args.max_iter_cp
+    threshold_type = args.threshold_type
+    alpha = args.alpha
+    threshold_param = args.threshold_param
+
     ###################################################
     ###################################################
 
@@ -164,33 +153,11 @@ if __name__ == "__main__":
     
     crop_transform = transforms.Compose([transforms.CenterCrop(crop_size)])
     if crop:
-        dataset = PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=crop_size,seed =seed)
+        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=crop_size,seed =seed)
     else:
-        dataset = PANDataset(root_dir=data_path, split='train' ,transform=None,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=None,seed =seed)
+        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=None,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=None,seed =seed)
 
     subset = torch.utils.data.Subset(dataset, data_idx)
-
-    Hsi_noisy = dataset.simulate_low_res_hsi(subset[0].unsqueeze(0))
-    Pan_noisy = dataset.get_panchromatic(subset[0].unsqueeze(0))
-    grad_panc = nabla(Pan_noisy)
-    # parametre chambolle 
-    # Sélection de la fonction weight
-    if weight_type == "hard":
-        weight_fun = lambda c,thresh,epsilon: hard_threshold(c, thresh, epsilon)
-    else:
-        weight_fun = lambda c,thresh,tau: soft_threshold(c, thresh, tau)
-    params = {
-        'max_iter': 200,
-        'lmbda': 1e-2,
-        'theta': 1,
-        'sigma': 2,
-        'tau': 0.99/2,
-        'grad_panc': grad_panc,
-        'thresh': thresh,
-        'muette' : muette,
-        'weight_fun': weight_fun
-    }
-
 
     # Operators parameters 
     A,A_adj, R, R_adj = dataset.get_operators()
@@ -203,13 +170,15 @@ if __name__ == "__main__":
     # Run loop
     ######
 
-    
+    Hsi_noisy = dataset.simulate_low_res_hsi(subset[0].unsqueeze(0))
+    Pan_noisy = dataset.get_panchromatic(subset[0].unsqueeze(0))
+    grad_panc = nabla(Pan_noisy)
 
     root.create_dataset('hsi_noise', data=Hsi_noisy.cpu().numpy())
     root.create_dataset('pan_noise ', data=Pan_noisy.cpu().numpy())
 
 
-    print(f"Running experiment : lambda = {lmbda}, lambda_m = {lmbda_m},p = {p},q = {q} ,r = {r}, noise_level = {noise_level},sigma = {sigma},scale = {scale},data_idx = {data_idx},crop = {crop},crop_size = {crop_size},device = {device},seed = {seed},thresh = {thresh},muette = {muette},weight_type = {weight_type},epsilon = {epsilon},tau = {tau}")
+    print(f"Running experiment : lambda = {lmbda}, lambda_m = {lmbda_m},p = {p},q = {q} ,r = {r}, noise_level = {noise_level},sigma = {sigma},scale = {scale},data_idx = {data_idx},crop = {crop},crop_size = {crop_size},device = {device},seed = {seed},threshold_type = {threshold_type},alpha= {alpha},threshold_param = {threshold_param} ")
     print('-----------------------------------')  
     root.attrs['lambda'] = lmbda
     root.attrs['lambda_m'] = lmbda_m
@@ -224,11 +193,24 @@ if __name__ == "__main__":
     root.attrs['crop_size'] = crop_size
     root.attrs['device'] = device
     root.attrs['seed'] = seed
-    root.attrs['thresh'] = thresh
-    root.attrs['muette'] = muette
-    root.attrs['weight_type'] = weight_type
-    root.attrs['epsilon'] = epsilon
-    root.attrs['tau'] = tau
+    root.attrs['threshold_type'] = threshold_type 
+    root.attrs['alpha'] = alpha
+    root.attrs['threshold_param'] = threshold_param
+
+
+    # parametre chambolle 
+    params = {
+    'max_iter': max_iter_cp,         # niters → max_iter (nom attendu par TVPrior)
+    'lmbda': 1e-2,          # paramètre supplémentaire
+    'theta': lmbda ,            # paramètre de régularisation
+    'sigma': theta_cp,                  # sigma = gain (gain=2)   
+    'tau': 0.99/sigma_cp,            # tau = 0.99 / gain (calculé)
+    'grad_panc' : grad_panc,  # le gradient de la panchromatique
+    'threshold_type' : threshold_type,  # 'soft' or 'hard'                                             
+    'alpha' : alpha,  # threshold value
+    'threshold_param'  : threshold_param  # epsilon (hard) or tau (soft)
+    }
+
 
     metrics = {}
     reconstructed_ar = torch.zeros([len(subset), dataset.nband, crop_size, crop_size], device=device, dtype=dtype)
@@ -244,7 +226,7 @@ if __name__ == "__main__":
         # get_panchromatic image + noise 
         Y_M = dataset.get_panchromatic(data.unsqueeze(0)).to(device=device,dtype=dtype)
 
-        optim = PANTVGradAlignement(
+        optim = PANTVGradAlignment(
                     A=A,
                     Aadj=A_adj,
                     spectral_op = R,
@@ -258,6 +240,7 @@ if __name__ == "__main__":
                     q = q,
                     r = r,
                     verbose=True,
+                    root = root,
                     params = params)
 
 
@@ -307,11 +290,11 @@ if __name__ == "__main__":
                 'noise_level': noise_level,
                 'sigma': sigma,
                 'scale': scale,
-                'thresh' : thresh,
-                'muette' : muette,
-                'weight_type' : weight_type,
-                'epsilon' : epsilon,
-                'tau' : tau
+                'threshold_type' : threshold_type,
+                'alpha' : alpha,
+                'threshold_param' : threshold_param
+
+
             }
         }
     }

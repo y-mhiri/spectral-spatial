@@ -1,4 +1,5 @@
-from pan_gradient_prox import PANProximalGradient
+from pan_gradient_prox import PANProximalGradient 
+from nabla import nabla,nabla_adjoint
 import torch
 
 
@@ -71,6 +72,7 @@ class PANTVCTV(PANProximalGradient):
         r_star = get_dual_exponent(self.r)
 
         # Projection duale + formule de Moreau
-        x_tilde = x / self.lmbda
+        grad = nabla(x)
+        x_tilde = grad / self.lmbda
         proj = self.project_dual_ball_r(x_tilde, p_star, q_star, r_star)
-        return x - self.lmbda * proj
+        return x - self.lmbda * nabla_adjoint(proj)

@@ -1,7 +1,6 @@
 import torch
 from deepinv.loss.metric import SSIM
 
-
 def RNMSE(A,B):
     assert A.shape == B.shape, "A and B must have the same shape"
 

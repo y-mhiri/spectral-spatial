@@ -1,5 +1,13 @@
 import sys
 import os
+# Chemin des modules
+path = "/home/ndiayem/Documents/spectral-spatial/src"
+sys.path.append(f'{path}/algorithms')
+sys.path.append(f'{path}/datasets')
+sys.path.append(f'{path}/metrics')
+
+from pansharpening import PANDataset
+
 import argparse
 import yaml
 import numpy as np
@@ -11,14 +19,6 @@ from sklearn.decomposition import PCA
 from scipy.linalg import svd
 from math import sqrt
 from torchvision import transforms
-
-# Chemin des modules
-path = "/home/ndiayem/Documents/spectral-spatial/src"
-sys.path.append(f'{path}/algorithms')
-sys.path.append(f'{path}/datasets')
-sys.path.append(f'{path}/metrics')
-
-from pansharpening import PANDataset
 
 def load_dataset(data_path, data_idx, crop, crop_size, scale, sigma, noise_level, device, seed):
     """Charge le dataset hyperspectral avec option de recadrage"""
@@ -112,65 +112,105 @@ if __name__ == "__main__":
     
     # Options supplémentaires
     parser.add_argument('--dataset', type=str, help='Nom du dataset à utiliser')
-    parser.add_argument('--group', type=int, help='Numéro de groupe')
+    parser.add_argument('--group', type=int, nargs='*', help='Numéro(s) de groupe à traiter')
+    parser.add_argument('--all_groups', action='store_true', 
+                       help='Traiter tous les groupes disponibles')
 
     args = parser.parse_args()
     rich.print('[bold green]Début de la visualisation...')
 
-    # Configuration des chemins
-    folder = args.storage_path
-    if args.group:
-        folder = os.path.join(folder, f'group_{args.group}')
-    
-    with open(os.path.join(folder, 'info.yaml'), 'r') as f:
-        info = yaml.safe_load(f)
-    
-    dataset_path = info['datasets'][args.dataset] if args.dataset else next(iter(info['datasets'].values()))
-    
-    # Chargement des paramètres
-    root = zarr.open(f'{folder}/results.zarr', mode='r')
-    attrs = root.attrs
-    ds, rgb_index = load_dataset(
-        dataset_path, attrs['data_idx'], attrs['crop'], attrs['crop_size'],
-        attrs['scale'], attrs['sigma'], attrs['noise_level'],
-        attrs['device'], attrs['seed']
-    )
-    
-    # Création du dossier de sortie
-    fig_folder = os.path.join(folder, 'figures')
-    os.makedirs(fig_folder, exist_ok=True)
-    
-    # Configuration des visualisations
-    viz_args = {
-        'rgb_indices': rgb_index if args.rgb else None,
-        'show_eigenimage': args.eigenimage,
-        'band_indices': args.band_indices,
-        'eigen_indices': args.eigen_indices,
-        'folder': fig_folder
-    }
-    
-    # Traitement des images
-    idxs = args.idxs if args.idxs else range(len(ds))
-    for idx in idxs:
-        # Nouvelle visualisation panchromatique
-        if args.panchromatic_noisy:
-            pan_noisy = root['Pan_noise '][idx]
-            if pan_noisy.ndim == 3 and pan_noisy.shape[0] == 1:
-                pan_noisy = pan_noisy[0]
-            pan_noisy = (pan_noisy - np.min(pan_noisy)) / (np.max(pan_noisy) - np.min(pan_noisy))
-            generate_figure(pan_noisy, f'pan_noisy_{idx}', fig_folder)
+    # Déterminer les groupes à traiter
+    if args.all_groups:
+        # Trouver tous les groupes dans le dossier de stockage
+        groups = []
+        for item in os.listdir(args.storage_path):
+            if item.startswith('group_') and os.path.isdir(os.path.join(args.storage_path, item)):
+                try:
+                    groups.append(int(item.split('_')[1]))
+                except ValueError:
+                    continue
+        groups = sorted(groups)
+    elif args.group:
+        groups = args.group
+    else:
+        groups = [0]  # Par défaut, traiter le groupe 0
+
+    # Traiter chaque groupe
+    for group_num in groups:
+        group_path = os.path.join(args.storage_path, f'group_{group_num}')
+        if not os.path.exists(group_path):
+            rich.print(f"[red]Le groupe {group_num} n'existe pas dans {args.storage_path}[/red]")
+            continue
+
+        rich.print(f"\n[bold]Traitement du groupe {group_num}...")
         
-        # Visualisations existantes
-        if args.hsi_low_noisy:
-            hsi_low_noisy = root['Hsi_noise'][idx]  # Format [C, H, W]
-            visualize_hyperspectral_image(hsi_low_noisy, f'hsi_low_noisy_{idx}', **viz_args)
+        try:
+            #Charger la configuration
+            info_path = os.path.join(group_path, 'info.yaml')
+            if not os.path.exists(info_path):
+               rich.print(f"[red]Fichier info.yaml introuvable dans {group_path}[/red]")
+               continue
+
+            with open(info_path, 'r') as f:
+                 info = yaml.safe_load(f)
             
-        if args.reconstructed:
-            reconstructed = root['reconstructed'][idx]
-            visualize_hyperspectral_image(reconstructed, f'reconstructed_{idx}', **viz_args)
+            dataset_path = info['datasets'][args.dataset] if args.dataset else next(iter(info['datasets'].values()))
+            #dataset_path = "/uds_data/listic/mhiriy/data/harvard.zarr"
+            info['datasets'][args.dataset] if args.dataset else next(iter(info['datasets'].values()))
             
-        if args.ground_truth:
-            gt = ds[idx].numpy()
-            visualize_hyperspectral_image(gt, f'ground_truth_{idx}', **viz_args)
+            # Chargement des paramètres
+            zarr_path = os.path.join(group_path, 'results.zarr')
+            if not os.path.exists(zarr_path):
+                rich.print(f"[red]Fichier results.zarr introuvable dans {group_path}[/red]")
+                continue
+
+            root = zarr.open(zarr_path, mode='r')
+            attrs = root.attrs
+            ds, rgb_index = load_dataset(
+                dataset_path, attrs['data_idx'], attrs['crop'], attrs['crop_size'],
+                attrs['scale'], attrs['sigma'], attrs['noise_level'],
+                attrs['device'], attrs['seed']
+            )
+            
+            # Création du dossier de sortie
+            fig_folder = os.path.join(group_path, 'figures')
+            os.makedirs(fig_folder, exist_ok=True)
+            
+            # Configuration des visualisations
+            viz_args = {
+                'rgb_indices': rgb_index if args.rgb else None,
+                'show_eigenimage': args.eigenimage,
+                'band_indices': args.band_indices,
+                'eigen_indices': args.eigen_indices,
+                'folder': fig_folder
+            }
+            
+            # Traitement des images
+            idxs = args.idxs if args.idxs else range(len(ds))
+            for idx in idxs:
+                try:
+                    if args.panchromatic_noisy and 'pan_noise ' in root:
+                        pan_noisy = root['pan_noise '][idx]
+                        if pan_noisy.ndim == 3 and pan_noisy.shape[0] == 1:
+                            pan_noisy = pan_noisy[0]
+                        pan_noisy = (pan_noisy - np.min(pan_noisy)) / (np.max(pan_noisy) - np.min(pan_noisy))
+                        generate_figure(pan_noisy, f'pan_noisy_{idx}', fig_folder)
+                    
+                    if args.hsi_low_noisy and 'hsi_noise' in root:
+                        hsi_low_noisy = root['hsi_noise'][idx]
+                        visualize_hyperspectral_image(hsi_low_noisy, f'hsi_low_noisy_{idx}', **viz_args)
+                        
+                    if args.reconstructed and 'reconstructed' in root:
+                        reconstructed = root['reconstructed'][idx]
+                        visualize_hyperspectral_image(reconstructed, f'reconstructed_{idx}', **viz_args)
+                        
+                    if args.ground_truth:
+                        gt = ds[idx].numpy()
+                        visualize_hyperspectral_image(gt, f'ground_truth_{idx}', **viz_args)
+                except Exception as e:
+                    rich.print(f"[red]Erreur lors du traitement de l'image {idx} du groupe {group_num}: {str(e)}[/red]")
+        
+        except Exception as e:
+            rich.print(f"[red]Erreur lors du traitement du groupe {group_num}: {str(e)}[/red]")
 
     rich.print('[bold green]Visualisation terminée!')
