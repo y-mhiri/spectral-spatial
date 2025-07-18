@@ -66,10 +66,11 @@ class TVGradAlignment(ChambollePock):
         grad_panc_orth[...,0] = grad_panc[...,1]
         grad_panc_orth[...,1] = -grad_panc[...,0]
         norm_grad_panc = norm(grad_panc, dim=-1, keepdim=True) 
+        c = norm_grad_panc/(torch.sum(norm(grad_panc, dim=-1)) + 1e-7)
 
         grads = torch.stack((grad_panc_orth/(norm_grad_panc + 1e-7), grad_panc/(norm_grad_panc+ 1e-7)), dim=-1).transpose(-2,-1)
 
-        weights = self.weight_fun(norm_grad_panc, self.alpha)
+        weights = self.weight_fun(c, self.alpha)
         # Normalize weights
         return weights * grads
 

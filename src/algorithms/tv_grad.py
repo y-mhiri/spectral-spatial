@@ -24,7 +24,7 @@ class GradientWeights:
     def soft_threshold(tau=1.0):
         """Soft thresholding with sigmoid transition"""
         def weight_fn(c, alpha):
-            return torch.stack((torch.ones_like(c),sigmoid(tau * (c - alpha))), dim=-1).transpose(-2, -1)
+            return torch.stack((torch.ones_like(c),sigmoid((c - alpha)/tau)), dim=-1).transpose(-2, -1)
         return weight_fn
 
 
@@ -72,11 +72,11 @@ class TVGradAlignment(ChambollePock):
         
         # Compute weights using selected strategy
         c = norm_grad_panc
+        c = c/(torch.sum(norm(grad_panc, dim=-1)) + 1e-7)
         weights = self.weight_fun(c,self.alpha)
         
         # Normalize weights
-        weights_sum = torch.sum(weights, dim=-1, keepdim=True)
-        weights = weights / (weights_sum + 1e-7) 
+        
         return weights * grads
 
     def compute_L(self, nband):

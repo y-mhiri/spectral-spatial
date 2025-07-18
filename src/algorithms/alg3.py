@@ -1,7 +1,7 @@
 import torch
 from nabla import nabla
 from pan_gradient_prox import PANProximalGradient
-from tv_grad import TVGradAlignment
+from grad_tv import TVGradAlignment
 
 class PANTVGradAlignment(PANProximalGradient):
     """
