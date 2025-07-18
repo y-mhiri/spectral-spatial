@@ -17,7 +17,7 @@ class TVPrior(ChambollePock):
  
 
     def compute_L(self, nband):
-        return sqrt(8)*self.lmbda*nband
+        return sqrt(8)*nband
     
 
     def K(self, u, **kwargs):
@@ -77,10 +77,6 @@ class TVPrior(ChambollePock):
         Projection sur la boule duale l^{p*,q*,r*} <= 1.
         Gère explicitement p*, q*, r* = infinity.
         """
-
-        print(self.p)
-        print(self.q)
-        print(self.r)
 
         def get_dual_exponent(val):
             if val == 1:

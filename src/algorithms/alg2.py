@@ -29,11 +29,11 @@ class PANTVCB(PANProximalGradient):
         """
         params = {}
 
-        params['compute_L'] = {'nband': 31}
+        params['compute_L'] = {'nband': x.shape[1]}
         params['K'] = {}
         params['K_adjoint'] = {}
         params['prox_sigma_g_conj'] = {}
-        params['prox_tau_f'] = {'y': x, 'sigma2': 1}
+        params['prox_tau_f'] = {'y': x, 'sigma2': self.step_size*self.lmbda}
         params['loss_fn'] = {}
 
 

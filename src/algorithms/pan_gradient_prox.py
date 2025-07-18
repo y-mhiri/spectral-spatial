@@ -25,10 +25,11 @@ class PANProximalGradient(nn.Module):
         R (torch.Tensor): Matrice de projection panchromatique
     """
 
-    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda, lmbda_m, tol,scale,p,q,r,verbose):
+    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, step_size, lmbda, lmbda_m, tol,scale,p,q,r,verbose):
         super().__init__()
         self.max_iter = max_iter
         self.scale = scale
+        self.step_size = step_size
         self.lmbda = lmbda
         self.lmbda_m = lmbda_m
         self.tol = tol
@@ -192,7 +193,7 @@ class PANProximalGradient(nn.Module):
             
             # Étape de gradient
             grad = self.grad_f(U, Y_H, Y_M)
-            U = self.proxg(U - self.lmbda * grad)
+            U = self.proxg(U - self.step_size * grad)
             
             # Calcul des métriques
             total_cost,data_term_h,data_term_m,tv_term = self.compute_cost(U, Y_H, Y_M)
