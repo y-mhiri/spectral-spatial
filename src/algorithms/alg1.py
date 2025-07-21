@@ -67,7 +67,8 @@ class PANTVGradProj(PANProximalGradient):
         r_star = get_dual_exponent(self.r)
 
         # Initialisation FISTA
-        w = torch.zeros_like(gradient(x))
+        b, c, h, w = x.shape
+        w = torch.ones((b, c, h, w, 2), device=x.device, dtype=x.dtype)
         y = w.clone()
         t = 1.0
         tau = self.tau  # Initial step size
