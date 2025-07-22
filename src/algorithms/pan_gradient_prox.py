@@ -25,7 +25,7 @@ class PANProximalGradient(nn.Module):
         R (torch.Tensor): Matrice de projection panchromatique
     """
 
-    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, step_size, lmbda, lmbda_m, tol,scale,p,q,r,verbose):
+    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, step_size, lmbda, lmbda_m, tol,scale,p,q,r, verbose, init=None):
         super().__init__()
         self.max_iter = max_iter
         self.scale = scale
@@ -43,7 +43,7 @@ class PANProximalGradient(nn.Module):
         self.r = r
 
 
-
+        self.init = init
 
         # Configuration du logger simple vers stdout
         self.logger = logging.getLogger('PANProximalGradient')
@@ -178,8 +178,11 @@ class PANProximalGradient(nn.Module):
         Returns:
             tuple: (Image estimée [b,c,h,w], historique des coûts)
         """
-        U = self.Aadj(Y_H).clone()
-        #U = torch.zeros_like(self.Aadj(Y_H)) 
+
+        if self.init is not None:
+            U = self.init.clone()
+        else:
+            U = self.Aadj(Y_H).clone()
         cost_history = []
         
         # En-tête du tableau
@@ -201,13 +204,14 @@ class PANProximalGradient(nn.Module):
             cost_history[it] = total_cost.item()
             
             # Affichage conditionnel
-            if it % 10 == 0 or it == self.max_iter - 1 or delta_U < self.tol:
-                log_message = (f"{it:<5} | {total_cost.item():<12.3e} | {data_term_h.item():<12.3e} | "
+            if self.verbose:
+                if it % 10 == 0 or it == self.max_iter - 1 or delta_U < self.tol:
+                    log_message = (f"{it:<5} | {total_cost.item():<12.3e} | {data_term_h.item():<12.3e} | "
                              f"{data_term_m.item():<12.3e} | {tv_term.item():<12.3e} | {delta_U:<12.3e}")
-                self.logger.info(log_message)
-                
-                if delta_U < self.tol:
-                    self.logger.info(f"\nConvergence atteinte à l'itération {it} (ΔU = {delta_U:.3e} < {self.tol})")
-                    break
+                    self.logger.info(log_message)
+
+            if delta_U < self.tol:
+                self.logger.info(f"\nConvergence atteinte à l'itération {it} (ΔU = {delta_U:.3e} < {self.tol})")
+                break
         
         return U, cost_history
