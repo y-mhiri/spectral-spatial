@@ -49,7 +49,7 @@ class PANHandler():
         )
         self.downsample_op = Downsampling(
             img_size=img_size,
-            filter='gaussian',
+            filter=None,
             factor=self.scale,
             padding='circular',
             device=self.device
