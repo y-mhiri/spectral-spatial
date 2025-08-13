@@ -150,7 +150,7 @@ if __name__ == "__main__":
     
     crop_transform = transforms.Compose([transforms.CenterCrop(crop_size)])
     if crop:
-        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=crop_size,seed =seed)
+        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma/(crop_size*crop_size),sigma1 = noise_level/(crop_size*crop_size),device=device,size=crop_size,seed =seed)
     else:
         dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=None,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=None,seed =seed)
 
