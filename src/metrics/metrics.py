@@ -1,5 +1,6 @@
 import torch
 from deepinv.loss.metric import SSIM
+from deepinv.loss.metric import ERGAS
 
 def RNMSE(A,B):
     assert A.shape == B.shape, "A and B must have the same shape"
@@ -32,6 +33,10 @@ def SSIME(A,B):
     m = SSIM()
     return m(B,A)
 
+def ERGASE(A,B):
+    assert A.shape == B.shape ,""" assert A.shape == B.shape, "A and B must have the same shape """
+    m = ERGAS(factor=4)
+    return m(B,A)
 
 def compute_metrics(gt,est, numpy=False):
 
@@ -40,10 +45,12 @@ def compute_metrics(gt,est, numpy=False):
                 'CC': CC(gt,est).cpu().numpy().tolist(),
                 'PSNR': PSNR(gt,est).cpu().numpy().tolist(),
                 'SAM': SAM(gt,est).cpu().numpy().tolist(),
-                'SSIM': SSIME(gt,est).cpu().numpy().tolist()}
+                'SSIM': SSIME(gt,est).cpu().numpy().tolist(),
+                'ERGAS': SERGASE(gt,est).cpu().numpy().tolist()}
 
     return {'RNMSE': RNMSE(gt,est),
             'CC': CC(gt,est),
             'PSNR': PSNR(gt,est),
             'SAM': SAM(gt,est),
-            'SSIM': SSIME(gt,est)}
+            'SSIM': SSIME(gt,est),
+            'ERGAS': ERGASE(gt,est)}
