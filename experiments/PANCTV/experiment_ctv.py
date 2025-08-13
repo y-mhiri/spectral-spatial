@@ -194,8 +194,8 @@ if __name__ == "__main__":
     params = {
     'max_iter': max_iter_cp,         # niters → max_iter (nom attendu par TVPrior)
     'lmbda': lmbda,          # paramètre supplémentaire
-    'theta_cp': theta_cp ,            # paramètre de régularisation
-    'sigma_cp': sigma_cp,                  # sigma = gain (gain=2)   
+    'theta': theta_cp ,            # paramètre de régularisation
+    'sigma': sigma_cp,                  # sigma = gain (gain=2)   
     'tau': 0.99/sigma_cp              # tau = 0.99 / gain (calculé)             
     }
 
@@ -276,7 +276,6 @@ if __name__ == "__main__":
                 'q': q,
                 'r': r,
                 'noise_level': noise_level,
-                'sigma': sigma,
                 'scale': scale
             }
         }
