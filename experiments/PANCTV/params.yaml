@@ -10,12 +10,12 @@ fixed_args:
     '--crop_center': True
     '--crop_size': 256
     '--lmbda_m': 5
-    '--scale': 6
+    '--scale': 4
     '--sigma': 500
     '--max_iter_cp': 3
     '--alpha': 1.0
-    '--theta': 1           
-    '--sigma': 2              
+    '--theta_cp': 1           
+    '--sigma_cp': 2              
 
 
 
