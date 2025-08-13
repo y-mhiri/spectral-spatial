@@ -10,8 +10,8 @@ class PANTVGradProj(PANProximalGradient):
     - Support des normes mixtes l^p,q,r
     """
     
-    def __init__(self, A, Aadj, spectral_op, spectral_op_t, max_iter, lmbda, lmbda_m, tau, tol, scale, verbose, max_iter_gp, p, q, r):
-        super().__init__(A, Aadj, spectral_op, spectral_op_t, max_iter, lmbda, lmbda_m, tol, scale, p, q, r, verbose)
+    def __init__(self, A, Aadj, spectral_op, spectral_op_t, max_iter, lmbda,alpha,lmbda_m, tau, tol, scale, verbose, max_iter_gp, p, q, r):
+        super().__init__(A, Aadj, spectral_op, spectral_op_t, max_iter, lmbda,alpha,lmbda_m, tol, scale, p, q, r, verbose)
         self.max_iter_gp = max_iter_gp  # Max iterations for gradient projection
         self.tau = tau                  # Fixed step size
         self.p = p                      # Norm parameters

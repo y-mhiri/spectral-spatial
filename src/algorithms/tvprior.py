@@ -1,162 +1,139 @@
-
 import torch
-from chambolle_pock import ChambollePock
 from math import sqrt
-from nabla import nabla, nabla_adjoint
-
-
+from chambolle_pock import ChambollePock  # ta base ci-dessus
+from nabla import nabla, nabla_adjoint         # tes opérateurs grad/div adjoints
 
 class TVPrior(ChambollePock):
+    """
+    Prior CTV l^{p,q,r} pour Chambolle–Pock avec projections duales:
+      (1,1,1) -> (inf,inf,inf) : clamp
+      (2,2,1) -> (2,2,inf)     : clip Frobenius par pixel (C x 2)
+      (inf,1,1)-> (1,inf,inf)  : proj L1 par pixel et par direction
+    """
 
     def __init__(self, p, q, r, *args, **kwargs):
         super(TVPrior, self).__init__(*args, **kwargs)
-        self.p = p 
+        self.p = p
         self.q = q
         self.r = r
 
- 
-
-    def compute_L(self, nband):
-        return sqrt(8)*self.lmbda*nband
-    
-
+    # --- Opérateurs K et K* ---
     def K(self, u, **kwargs):
-        """
-            Define the linear operator associated to the primal dual formulation of the problem
+        return nabla(u)
 
-            $$
-            Ku(x,y) = \sum_{sigma} \nabla(u(x,y,\sigma)) 
-            $$
-
-            :param Torch tensor u: Input hyper-spectral tensor of shape (batch, channels, height, width)
-            :return: The output of the linear operator
-
-        """
-
-        return nabla(u) 
-
-    def K_adjoint(self, q):
-
-        """
-            Define the adjoint operator associated to the primal dual formulation of the problem
-
-            $$
-                K^*q = (\nabla^*q, \nabla^*q, ..., \nabla^*q)^t
-            $$
-
-            :param Torch tensor q: Input tensor of shape (batch, height, width, 2)
-            :return: The output of the adjoint operator
-
-        """
-
+    def K_adjoint(self, q, **kwargs):
         return nabla_adjoint(q)
-        
-        
 
-    def prox_tau_f(self, u, tau, y, sigma2=1):
-        r"""
-        Proximal operator of the function :math:`\frac{1}{2\sigma^2}\|x-y\|_2^2`.
+    # --- Constante de Lipschitz de ∇ (2D) ---
+    def compute_L(self, **kwargs):
+        # ||∇|| = sqrt(8) pour diff. finies avant + Neumann en 2D
+        return sqrt(8.0)
+
+    # --- Prox de f : fidélité quadratique ---
+    def prox_tau_f(self, u, tau, y, sigma2=1.0, **kwargs):
+        return (sigma2 * u + tau * y) / (sigma2 + tau)
+
+    # =======================
+    #   Projections duales
+    # =======================
+    @staticmethod
+    def _proj_inf_inf_inf(z, radius):
+        # Proj sur {||.||_{∞,∞,∞} ≤ radius} : clamp élément par élément
+        return torch.clamp(z, -radius, radius)
+
+    @staticmethod
+    def _proj_2_2_inf(z, radius):
         """
-        return (sigma2*u + tau * y) / (sigma2 + tau)
-
-
-    # def prox_sigma_g_conj(self, q, sigma):
-    #     r"""
-        
-    #     Proximal operator of TV.
-
-
-    #     """
-
-    #     return q / torch.maximum(torch.norm(q, dim=-1, keepdim=True), torch.ones_like(q))
-    
-
-
-    def prox_sigma_g_conj(self, U,eps=1e-8):
+        Proj sur {||.||_{2,2,∞} ≤ radius} :
+          pour chaque pixel (H,W), clip Frobenius sur le bloc (C x 2)
         """
-        Projection sur la boule duale l^{p*,q*,r*} <= 1.
-        Gère explicitement p*, q*, r* = infinity.
+        # z : (B,C,H,W,2)
+        B, C, H, W, D = z.shape
+        z_flat = z.permute(0, 2, 3, 1, 4).reshape(-1, C * D)         # (B*H*W, C*2)
+        nF = torch.linalg.norm(z_flat, ord=2, dim=1, keepdim=True)   # (BHW,1)
+        # scale = max(1, nF / radius)
+        scale = torch.clamp(nF / radius, min=1.0)
+        z_flat = z_flat / scale
+        return z_flat.reshape(B, H, W, C, D).permute(0, 3, 1, 2, 4)
+
+    @staticmethod
+    def _proj_l1_ball_rows(V, radius=1.0):
         """
-
-        print(self.p)
-        print(self.q)
-        print(self.r)
-
-        def get_dual_exponent(val):
-            if val == 1:
-                return torch.inf
-            elif torch.isinf(torch.tensor(val)):
-                return 1.0
-            else:
-                return 1 / (1 - 1/val)
-
-        p_star = get_dual_exponent(self.p)
-        q_star = get_dual_exponent(self.q)
-        r_star = get_dual_exponent(self.r)
-        # Étape 1: Norme p* sur les canaux (axis=1)
-        if torch.isinf(torch.tensor(p_star, device=U.device)):
-            norm_p_star= torch.amax(torch.abs(U), dim=1, keepdim=True) # l^infini
-        else:
-            norm_p_star = torch.sum(torch.abs(U)**p_star, dim=1, keepdim=True)**(1/(p_star + eps))
-
-        # Étape 2: Norme q* sur les dérivées (axis=-1)
-        if torch.isinf(torch.tensor(q_star, device=U.device)):
-            norm_q_star= torch.amax(torch.abs(norm_p_star), dim=-1, keepdim=True)   # l^infini
-        else:
-            norm_q_star = torch.sum(norm_p_star**q_star, dim=-1, keepdim=True)**(1/(q_star + eps))
-
-        # Étape 3: Norme r* sur les pixels (axis=(2,3))
-        if torch.isinf(torch.tensor(r_star, device=U.device)):
-            norm_r_star= torch.amax(torch.abs(norm_q_star), dim=(2,3), keepdim=True)  # l^infini
-        else:
-            norm_r_star = torch.sum(norm_q_star**r_star, dim=(2,3), keepdim=True)**(1/(r_star + eps))
-
-        # Scaling pour respecter ||U||_{p*,q*,r*} <= 1
-        scaling = torch.maximum(torch.tensor(1.0, device=U.device), norm_r_star)
-        return (U / (scaling + eps))
-    
-    
-    def ctv_norm(self, U,eps=1e-8):
+        Projection L1 par ligne sur une boule de rayon 'radius'.
+        V : (N, C)
         """
-        Calcule la norme CTV l^p,q,r avec support pour p,q,r = infini.
-        
-        Args:
-            U (torch.Tensor): Tenseur de gradients [b,c,h,w,2]
-            p, q, r (float or torch.inf): Exposants de la norme
-            eps (float): Petite valeur pour stabilité numérique
-            
-        Returns:
-            torch.Tensor: Norme CTV [b,1,1,1]
+        absV = V.abs()
+        s, _ = torch.sort(absV, dim=1, descending=True)
+        cssv = torch.cumsum(s, dim=1)
+        r = torch.arange(1, V.shape[1] + 1, device=V.device, dtype=V.dtype).view(1, -1)
+        cond = s > (cssv - radius) / r
+        rho = cond.sum(dim=1) - 1
+        theta = (cssv[torch.arange(V.shape[0]), rho] - radius) / (rho.to(V.dtype) + 1.0)
+        theta = theta.unsqueeze(1)
+        return torch.sign(V) * torch.clamp(absV - theta, min=0.0)
+
+    @staticmethod
+    def _proj_1_inf_inf(z, radius):
         """
-        # Norme p sur les canaux (axis=1)
-        if torch.isinf(torch.tensor(self.p)):
-            norm_p = torch.amax(torch.abs(U), dim=1, keepdim=True)  # l^infini
-        else:
-            norm_p = torch.sum(torch.abs(U)**self.p, dim=1, keepdim=True)**(1/(self.p + eps))
+        Proj sur {||.||_{1,∞,∞} ≤ radius} :
+          pour chaque direction (2) et chaque pixel (B,H,W),
+          on projette le vecteur (C,) sur la boule L1 de rayon 'radius'.
+        """
+        B, C, H, W, D = z.shape
+        out = torch.empty_like(z)
+        for j in range(D):
+            Zj = z[..., j]                               # (B,C,H,W)
+            V = Zj.permute(0, 2, 3, 1).reshape(-1, C)    # (B*H*W, C)
+            Vp = TVPrior._proj_l1_ball_rows(V, radius=radius)
+            out[..., j] = Vp.reshape(B, H, W, C).permute(0, 3, 1, 2)
+        return out
 
-        # Norme q sur les dérivées (axis=-1)
-        if torch.isinf(torch.tensor(self.q)):
-            norm_q = torch.amax(torch.abs(norm_p), dim=-1, keepdim=True)  # l^infini
-        else:
-            norm_q = torch.sum(norm_p**self.q, dim=-1, keepdim=True)**(1/(self.q + eps))
+    @staticmethod
+    def _select_dual_projection(p, q, r):
+        """
+        Sélectionne la projection sur la boule unitaire de la norme duale (rayon = 1).
+        (1,1,1)     -> dual = (∞,∞,∞)  -> clamp
+        (2,2,1)     -> dual = (2,2,∞)  -> clip Frobenius par pixel
+        (inf,1,1)   -> dual = (1,∞,∞)  -> proj L1 par pixel et par direction
+        """
+        if (p, q, r) == (1, 1, 1):
+            return TVPrior._proj_inf_inf_inf
+        if (p, q, r) == (2, 2, 1):
+            return TVPrior._proj_2_2_inf
+        if p in (float('inf'), torch.inf) and (q, r) == (1, 1):
+            return TVPrior._proj_1_inf_inf
+        raise NotImplementedError("Configs supportées : (1,1,1), (2,2,1), (inf,1,1).")
 
-        # Norme r sur les pixels (axis=(2,3))
-        if torch.isinf(torch.tensor(self.r)):
-            norm_r = torch.amax(torch.abs(norm_q), dim=(2,3), keepdim=True)  # l^infini
-        else:
-            norm_r = torch.sum(norm_q**self.r, dim=(2,3), keepdim=True)**(1/(self.r + eps))
+    # --- Prox de g* (projection sur la boule duale de rayon λ) ---
+    def prox_sigma_g_conj(self, Q, sigma=None, **kwargs):
+        """
+        Pour g(z) = λ ||z||_{p,q,r} :
+        prox_{σ g^*}(Q) = Proj_{ ||.||_{(p,q,r)^*} ≤ λ } (Q),
+        indépendant de σ.
+        """
+        proj_unit = self._select_dual_projection(self.p, self.q, self.r)
+        lam = self.lmbda
 
-        return norm_r
-        
+        # Applique la projection unitaire puis adapte le rayon λ,
+        # ou directement utiliser la variante à rayon λ :
+        # - pour clamp : clamp(Q, -lam, lam)
+        # - pour L2 bloc : scale = max(1, ||bloc||/lam)
+        # - pour L1 : proj_l1_ball_rows(..., radius=lam)
+        if (self.p, self.q, self.r) == (1, 1, 1):
+            return self._proj_inf_inf_inf(Q, radius=lam)
+        if (self.p, self.q, self.r) == (2, 2, 1):
+            return self._proj_2_2_inf(Q, radius=lam)
+        if self.p in (float('inf'), torch.inf) and (self.q, self.r) == (1, 1):
+            return self._proj_1_inf_inf(Q, radius=lam)
 
-    def loss_fn(self, u, y, lmbda):
-        # Terme de fidélité aux données (L2)
-        data_fidelity = 0.5 * torch.norm(u - y)**2
-        # Terme de régularisation CTV (utilisant p, q, r)
-        grad_u = nabla(u)  # [b,c,h,w,2]
-        ctv = self.ctv_norm(grad_u)  # Utilisez votre implémentation de la norme CTV
-        
-        return data_fidelity + lmbda * ctv
-    
+        # fallback (ne devrait pas arriver car _select_dual_projection leve déjà)
+        return proj_unit(Q, radius=lam)
 
-
+    # (Optionnel) Pour du logging/visualisation :
+    def loss_fn(self, u, y, lmbda, **kwargs):
+        """
+        f(u) = 0.5 ||u - y||^2 + λ * TV_{p,q,r}(u)  (valeur diagnostique)
+        """
+        data = 0.5 * torch.norm(u - y) ** 2
+        # NB: calculer exactement ||∇u||_{p,q,r} coûte ; à n'utiliser qu'en debug
+        return data
