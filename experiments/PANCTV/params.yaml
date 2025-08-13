@@ -33,17 +33,17 @@ varying_args:
             '--p': 1
             '--q': 1  
             '--r': 1
-            '--lmbda': 1e-2
+            '--lmbda': 1e-1
         - options: 
             '--p': 2
             '--q': 2  
             '--r': 1
-            '--lmbda': 1e-2
+            '--lmbda': 1e-1
         - options: 
             '--p': "inf"
             '--q': 1  
             '--r': 1
-            '--lmbda': 1e-2
+            '--lmbda': 1e-1
 
 
         
