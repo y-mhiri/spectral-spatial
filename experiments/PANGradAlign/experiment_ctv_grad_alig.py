@@ -243,7 +243,6 @@ if __name__ == "__main__":
                     q = q,
                     r = r,
                     verbose=True,
-                    root = root,
                     params = params)
 
 
