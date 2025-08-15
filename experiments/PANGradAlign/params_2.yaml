@@ -15,8 +15,8 @@ fixed_args:
     '--max_iter_cp' : 100
     '--threshold_type' : 'soft'   
     '--threshold_param' : 0.5
-    '--p': 2
-    '--q': 2
+    '--p': "inf"
+    '--q': 1
     '--r': 1
         
 
