@@ -11,11 +11,11 @@ fixed_args:
     '--crop_size': 256
     '--sigma': 500
     '--scale': 4
-    '--lmbda_m': 1
+    '--lmbda_m': 5
     '--max_iter_cp' : 50
     '--threshold_type' : 'soft'   
     '--threshold_param' : 0.5
-    '--p': "inf"
+    '--p': 1
     '--q': 1
     '--r': 1
         

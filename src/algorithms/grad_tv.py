@@ -99,8 +99,35 @@ class TVGradAlignment(ChambollePock):
         return alpha
 
 
-    def compute_L(self, nband):
-        return sqrt(8)*self.lmbda*nband #sqrt(band)?
+    def compute_L(self, nband=None):
+        """
+        Retourne une borne sûre de ||K|| avec K = W * nabla.
+
+        On utilise: ||K|| <= (max_x ||W(x)||_2) * ||nabla||, 
+        et ||nabla|| ~= sqrt(8) pour un gradient 2D (forward diffs).
+        """
+        # W attendu de forme [B, 1, H, W, 2, 2] (broadcast sur les canaux)
+        W = self.W
+        if W.dim() != 6 or W.size(-1) != 2 or W.size(-2) != 2:
+            raise ValueError(f"Expected W of shape [B,1,H,W,2,2], got {tuple(W.shape)}")
+
+        # norme spectrale (valeur singulière max) de chaque matrice 2x2
+        # reshape -> (N, 2, 2), SVD -> (N, 2), on prend la première colonne (s_max)
+        B, One, H, Wd, _, _ = W.shape
+        W_mats = W.reshape(B * One * H * Wd, 2, 2)
+        # torch.linalg.svd renvoie U, S, Vh ; S = (N, 2) triées décroissantes
+        S = torch.linalg.svdvals(W_mats)          # (N, 2)
+        s_max = S[:, 0]                           # (N,)
+        s_max_global = torch.max(s_max)           # scalaire
+
+        # ||nabla|| ~= sqrt(8) pour 2D; on prend une marge légère
+        grad_norm = sqrt(8.0)
+
+        L = (s_max_global * grad_norm).item()
+        # marge de sécu si on veut être très prudent
+        L = max(L, 1e-8)  # éviter 0
+        return L
+
     
     def K(self, u, **kwargs):
         """
