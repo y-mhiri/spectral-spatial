@@ -235,7 +235,7 @@ if __name__ == "__main__":
                     spectral_op_t = R_adj,
                     max_iter=max_iter,
                     lmbda=lmbda,
-                    alpha = alpha1
+                    alpha = alpha1,
                     lmbda_m=lmbda_m,
                     tol=tol,
                     scale=dataset.scale,
