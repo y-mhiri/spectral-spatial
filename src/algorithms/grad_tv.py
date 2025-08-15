@@ -1,6 +1,7 @@
 import torch
 
 from chambolle_pock import ChambollePock
+from skimage.filters import threshold_otsu
 from math import sqrt
 from torch.linalg import svd, norm
 from nabla import nabla, nabla_adjoint
@@ -53,7 +54,8 @@ class TVGradAlignment(ChambollePock):
             raise ValueError("threshold_type must be 'hard' or 'soft'")
 
         # Normalize alpha relative to gradient magnitudes
-        self.alpha = alpha / (torch.mean(norm(grad_panc, dim=-1)) + 1e-7)        
+        #self.alpha = alpha / (torch.mean(norm(grad_panc, dim=-1)) + 1e-7)  
+        self.alpha = self.compute_alpha_from_pan(grad_panc)      
         self.W = self._compute_weights(grad_panc)
         self.p = p
         self.q = q
@@ -73,6 +75,29 @@ class TVGradAlignment(ChambollePock):
         weights = self.weight_fun(c, self.alpha)
         # Normalize weights
         return weights * grads
+    
+
+    def compute_alpha_from_pan(self,pan_image):
+        """
+        Calcule le seuil alpha à partir d'une image panchromatique
+        en suivant exactement le code donné.
+        
+        Args:
+            pan_image (torch.Tensor): Image panchromatique [1,1,H,W]
+        
+        Returns:
+            float: seuil alpha
+        """
+        grad_norm = torch.norm(pan_image.squeeze(), dim=-1)  # Shape [H,W]
+        
+        # Critère c_n
+        criterion = grad_norm / (grad_norm.sum() + 1e-7)
+        c_n = criterion.cpu().numpy()
+        
+        alpha = threshold_otsu(c_n)
+        
+        return alpha
+
 
     def compute_L(self, nband):
         return sqrt(8)*self.lmbda*nband #sqrt(band)?
@@ -116,49 +141,71 @@ class TVGradAlignment(ChambollePock):
         return (sigma2*u + tau * y) / (sigma2 + tau)
 
 
-    def prox_sigma_g_conj(self,U,sigma,eps=1e-7):
-        r"""
-        
-        Proximal operator of the indicator function of the set :math:`\{q \mid \|q\|_2 = \|\alpha\|_2 , <q,\alpha>=0\}`.
+        # =======================
+    #   Projections duales
+    # =======================
+    @staticmethod
+    def _proj_inf_inf_inf(z, radius):
+        return torch.clamp(z, -radius, radius)
 
+    @staticmethod
+    def _proj_2_2_inf(z, radius):
+        # clip Frobenius par pixel (C x 2)
+        B, C, H, W, D = z.shape
+        z_flat = z.permute(0, 2, 3, 1, 4).reshape(-1, C * D)  # (BHW, C*2)
+        nF = torch.linalg.norm(z_flat, ord=2, dim=1, keepdim=True)  # (BHW,1)
+        scale = torch.clamp(nF / radius, min=1.0)
+        z_flat = z_flat / scale
+        return z_flat.reshape(B, H, W, C, D).permute(0, 3, 1, 2, 4)
 
+    @staticmethod
+    def _proj_l1_ball_rows(V, radius=1.0):
+        absV = V.abs()
+        s, _ = torch.sort(absV, dim=1, descending=True)
+        cssv = torch.cumsum(s, dim=1)
+        r = torch.arange(1, V.shape[1] + 1, device=V.device, dtype=V.dtype).view(1, -1)
+        cond = s > (cssv - radius) / r
+        rho = cond.sum(dim=1) - 1
+        theta = (cssv[torch.arange(V.shape[0]), rho] - radius) / (rho.to(V.dtype) + 1.0)
+        theta = theta.unsqueeze(1)
+        return torch.sign(V) * torch.clamp(absV - theta, min=0.0)
+
+    @staticmethod
+    def _proj_1_inf_inf(z, radius):
+        B, C, H, W, D = z.shape
+        out = torch.empty_like(z)
+        for j in range(D):
+            Zj = z[..., j]                              # (B,C,H,W)
+            V = Zj.permute(0, 2, 3, 1).reshape(-1, C)   # (BHW, C)
+            Vp = TVGradAlignment._proj_l1_ball_rows(V, radius=radius)
+            out[..., j] = Vp.reshape(B, H, W, C).permute(0, 3, 1, 2)
+        return out
+
+    @staticmethod
+    def _select_dual_projection(p, q, r):
+        if (p, q, r) == (1, 1, 1):
+            return TVGradAlignment._proj_inf_inf_inf
+        if (p, q, r) == (2, 2, 1):
+            return TVGradAlignment._proj_2_2_inf
+        if p in (float('inf'), torch.inf) and (q, r) == (1, 1):
+            return TVGradAlignment._proj_1_inf_inf
+        raise NotImplementedError("Configs supportées : (1,1,1), (2,2,1), (inf,1,1).")
+
+    def prox_sigma_g_conj(self, Q, sigma=None, **kwargs):
         """
+        Pour g(z) = λ ||z||_{p,q,r}, prox_{σ g^*}(Q) = Proj_{||.||_{(p,q,r)^*} ≤ λ}(Q)
+        """
+        lam = self.lmbda
+        if (self.p, self.q, self.r) == (1, 1, 1):
+            return self._proj_inf_inf_inf(Q, radius=lam)
+        if (self.p, self.q, self.r) == (2, 2, 1):
+            return self._proj_2_2_inf(Q, radius=lam)
+        if self.p in (float('inf'), torch.inf) and (self.q, self.r) == (1, 1):
+            return self._proj_1_inf_inf(Q, radius=lam)
+        # fallback générique
+        proj = self._select_dual_projection(self.p, self.q, self.r)
+        return proj(Q, radius=lam)
 
-        def get_dual_exponent(val):
-            if val == 1:
-                return torch.inf
-            elif torch.isinf(torch.tensor(val)):
-                return 1.0
-            else:
-                return 1 / (1 - 1/val)
-
-        p_star = get_dual_exponent(self.p)
-        q_star = get_dual_exponent(self.q)
-        r_star = get_dual_exponent(self.r)
-        # Étape 1: Norme p* sur les canaux (axis=1)
-        if torch.isinf(torch.tensor(p_star, device=U.device)):
-            norm_p_star= torch.amax(torch.abs(U), dim=1, keepdim=True) # l^infini
-        else:
-            norm_p_star = torch.sum(torch.abs(U)**p_star, dim=1, keepdim=True)**(1/(p_star + eps))
-
-        # Étape 2: Norme q* sur les dérivées (axis=-1)
-        if torch.isinf(torch.tensor(q_star, device=U.device)):
-            norm_q_star= torch.amax(torch.abs(norm_p_star), dim=-1, keepdim=True)   # l^infini
-        else:
-            norm_q_star = torch.sum(norm_p_star**q_star, dim=-1, keepdim=True)**(1/(q_star + eps))
-
-        # Étape 3: Norme r* sur les pixels (axis=(2,3))
-        if torch.isinf(torch.tensor(r_star, device=U.device)):
-            norm_r_star= torch.amax(torch.abs(norm_q_star), dim=(2,3), keepdim=True)  # l^infini
-        else:
-            norm_r_star = torch.sum(norm_q_star**r_star, dim=(2,3), keepdim=True)**(1/(r_star + eps))
-
-        # Scaling pour respecter ||U||_{p*,q*,r*} <= 1
-        scaling = torch.maximum(torch.tensor(1.0, device=U.device), norm_r_star)
-        return U / (scaling + eps)
-        
-    
-        
 
     def loss_fn(self, u, y, lmbda, sigma2=1): #dépendance en sigma2
         r"""

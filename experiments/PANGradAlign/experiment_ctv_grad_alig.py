@@ -44,6 +44,7 @@ if __name__ == "__main__":
     parser.add_argument("--theta_cp", type=float, default=1.0)
     parser.add_argument("--threshold_type", type=str, default="hard", choices=["hard", "soft"])
     parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--alpha1",type = float,default = 1.0)
     parser.add_argument("--threshold_param", type=float, default=1e-7)
     parser.add_argument("--tol", type=float, default=1e-12)
 
@@ -122,6 +123,7 @@ if __name__ == "__main__":
     p = args.p
     q = args.q 
     r = args.r
+    alpha1 = args.alpha1
 
 
     # CP params
@@ -153,7 +155,7 @@ if __name__ == "__main__":
     
     crop_transform = transforms.Compose([transforms.CenterCrop(crop_size)])
     if crop:
-        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=crop_size,seed =seed)
+        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma/(256*256),sigma1 = noise_level/(256*256),device=device,size=crop_size,seed =seed)
     else:
         dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=None,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=None,seed =seed)
 
@@ -201,9 +203,9 @@ if __name__ == "__main__":
     # parametre chambolle 
     params = {
     'max_iter': max_iter_cp,         # niters → max_iter (nom attendu par TVPrior)
-    'lmbda': 1e-2,          # paramètre supplémentaire
-    'theta': lmbda ,            # paramètre de régularisation
-    'sigma': theta_cp,                  # sigma = gain (gain=2)   
+    'lmbda': lmbda,          # paramètre supplémentaire
+    'theta': theta_cp ,            # paramètre de régularisation
+    'sigma': sigma_cp,                  # sigma = gain (gain=2)   
     'tau': 0.99/sigma_cp,            # tau = 0.99 / gain (calculé)
     'grad_panc' : grad_panc,  # le gradient de la panchromatique
     'threshold_type' : threshold_type,  # 'soft' or 'hard'                                             
@@ -233,6 +235,7 @@ if __name__ == "__main__":
                     spectral_op_t = R_adj,
                     max_iter=max_iter,
                     lmbda=lmbda,
+                    alpha = alpha1
                     lmbda_m=lmbda_m,
                     tol=tol,
                     scale=dataset.scale,

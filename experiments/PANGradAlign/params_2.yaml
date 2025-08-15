@@ -4,39 +4,41 @@ fixed_args:
     '--cuda_avail': True
     '--dtype': 'float32'
     '--seed': 42
-    '--max_iter': 30
+    '--max_iter': 2
     '--tol': 1e-12
     '--image_idx': [17]
     '--crop_center': True
-    '--crop_size': 128
-    '--noise_level': 0.001
-    '--sigma': 0.1
+    '--crop_size': 256
+    '--sigma': 500
     '--scale': 4
-    '--lmbda': 1e-4
-    '--lmbda_m': 2
-    '--max_iter_cp' : 10
-    '--alpha' : 1
+    '--lmbda_m': 5
+    '--max_iter_cp' : 5
     '--threshold_type' : 'soft'   
-    '--threshold_param' : 10
+    '--threshold_param' : 0.5
+    '--p': 1
+    '--q': 1  
+    '--r': 1
+        
+
 
 
 
 varying_args:
+    range:
+        options:
+            '--noise_level': [100,1000,400]
+            
+            
+            
 
+            
     groups: 
         - options: 
-            '--p': 1
-            '--q': 1  
-            '--r': 1
+            '--lmbda': 1e-4
         - options: 
-            '--p': 2
-            '--q': 1  
-            '--r': 1
+            '--lmbda': 1e-3
         - options: 
-            '--p': 2
-            '--q': 2  
-            '--r': 1
-        - options: 
-            '--p': "inf"
-            '--q': 1  
-            '--r': 1
+            '--lmbda': 1e-2
+
+
+        
