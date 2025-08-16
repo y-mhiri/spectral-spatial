@@ -6,7 +6,7 @@ fixed_args:
     '--seed': 42
     '--max_iter': 200
     '--tol': 1e-12
-    '--image_idx': [17]
+    '--image_idx': [2]
     '--crop_center': True
     '--crop_size': 256
     '--sigma': 500
@@ -15,7 +15,7 @@ fixed_args:
     '--max_iter_cp' : 50
     '--threshold_type' : 'soft'   
     '--threshold_param' : 0.5
-    '--p': "inf"
+    '--p': 1
     '--q': 1
     '--r': 1
         
@@ -34,13 +34,26 @@ varying_args:
             
     groups: 
         - options: 
-            '--lmbda': 0.02
+            '--lmbda': 0.0001
         - options: 
-            '--lmbda': 0.04
+            '--lmbda': 0.0002
         - options: 
-            '--lmbda': 0.06
+            '--lmbda': 0.0004
         - options: 
-            '--lmbda': 0.8
-        
+            '--lmbda': 0.0006
+        - options: 
+            '--lmbda': 0.0008
+        - options: 
+            '--lmbda': 0.001
+        - options: 
+            '--lmbda': 0.002
+        - options: 
+            '--lmbda': 0.004
+        - options: 
+            '--lmbda': 0.006
+        - options: 
+            '--lmbda': 0.008
+        - options: 
+            '--lmbda': 0.01        
 
         
