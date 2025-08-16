@@ -16,8 +16,8 @@ fixed_args:
     '--alpha': 1.0
     '--theta_cp': 1           
     '--sigma_cp': 2
-    '--p': 1
-    '--q': 1
+    '--p': 2
+    '--q': 2
     '--r': 1
 
 
