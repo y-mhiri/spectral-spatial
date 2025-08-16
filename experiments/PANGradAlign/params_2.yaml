@@ -15,8 +15,8 @@ fixed_args:
     '--max_iter_cp' : 50
     '--threshold_type' : 'soft'   
     '--threshold_param' : 0.5
-    '--p': 1
-    '--q': 1
+    '--p': 2
+    '--q': 2
     '--r': 1
         
 
@@ -54,6 +54,14 @@ varying_args:
         - options: 
             '--lmbda': 0.008
         - options: 
-            '--lmbda': 0.01        
+            '--lmbda': 0.01 
+        - options: 
+            '--lmbda': 0.02
+        - options: 
+            '--lmbda': 0.04
+        - options: 
+            '--lmbda': 0.06
+        - options: 
+            '--lmbda': 0.08     
 
         
