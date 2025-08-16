@@ -34,6 +34,13 @@ varying_args:
             
     groups: 
         - options: 
-            '--lmbda': 1e-1
+            '--lmbda': 0.02
+        - options: 
+            '--lmbda': 0.04
+        - options: 
+            '--lmbda': 0.06
+        - options: 
+            '--lmbda': 0.8
+        
 
         
