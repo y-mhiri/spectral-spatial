@@ -13,9 +13,9 @@ fixed_args:
     '--scale': 4
     '--lmbda_m': 5
     '--max_iter_cp' : 50
-    '--threshold_type' : 'soft'   
-    '--threshold_param' : 0.5
-    '--p': "inf"
+    '--threshold_type' : 'hard'   
+    '--threshold_param' : 1e-7
+    '--p': 1
     '--q': 1
     '--r': 1
         
