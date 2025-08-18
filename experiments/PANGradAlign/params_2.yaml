@@ -6,15 +6,15 @@ fixed_args:
     '--seed': 42
     '--max_iter': 200
     '--tol': 1e-12
-    '--image_idx': [2]
+    '--image_idx': [17]
     '--crop_center': True
     '--crop_size': 256
     '--sigma': 500
     '--scale': 4
     '--lmbda_m': 5
     '--max_iter_cp' : 50
-    '--threshold_type' : 'hard'   
-    '--threshold_param' : 1e-7
+    '--threshold_type' : 'soft'   
+    '--threshold_param' : 0.5
     '--p': "inf"
     '--q': 1
     '--r': 1
