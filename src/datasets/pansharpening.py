@@ -134,7 +134,7 @@ class PANDataset(data.Dataset):
         return A, A_adj, R, R_adj
 
 
-    def simulate_low_res_hsi(self, input_image):
+    def simulate_low_res_hsi(self, input_image, noise=True):
         """
         Simule une acquisition basse résolution (flou + sous-échantillonnage)
         
@@ -146,9 +146,9 @@ class PANDataset(data.Dataset):
         """
         if input_image.ndim != 4:
             raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
-        return self.noise(self.downsample_op(self.blur_op(input_image)))
+        return self.noise(self.downsample_op(self.blur_op(input_image))) if noise else self.downsample_op(self.blur_op(input_image))
 
-    def get_panchromatic(self, input_image):
+    def get_panchromatic(self, input_image, noise=True):
         """
         Calcule l'image panchromatique par moyenne spectrale
         
@@ -158,7 +158,7 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Image panchromatique [b,1,h,w]
         """
-        return self.noise(self.spectral_op(input_image))
+        return self.noise(self.spectral_op(input_image)) if noise else self.spectral_op(input_image)
     
     def create_spectral_matrix(self):
         """

@@ -25,7 +25,7 @@ fixed_args:
 varying_args:
     range:
         options:
-            '--noise_level': [100,1000,400]
+            '--noise_level': [100,500,900]
             
             
             

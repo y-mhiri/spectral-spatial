@@ -98,7 +98,7 @@ if __name__ == "__main__":
     out_path = args.storage_path
 
     dataset_name = data_path.split('/')[-1].split('.')[0]
-    algorithm = 'PANCTV'
+    algorithm = 'PANGradAlign'
 
     # Choose subset of data
     data_idx = args.image_idx # [6, 17]#  6,42,8,43]

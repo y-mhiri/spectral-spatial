@@ -49,6 +49,7 @@ if __name__ == "__main__":
     parser.add_argument("--image_idx", nargs="+", type=int, default=[6, 17])
     parser.add_argument("--crop_center", type=bool, default=True)
     parser.add_argument("--crop_size", type=int, default=256)
+    parser.add_argument("--noise_panchromatic", action="store_true", default=256)
 
     parser.add_argument("--lmbda", type=float, required=True)
     parser.add_argument("--alpha", type=float, required=True)
@@ -168,7 +169,7 @@ if __name__ == "__main__":
     ######
 
     Hsi_noisy = dataset.simulate_low_res_hsi(subset[0].unsqueeze(0))
-    Pan_noisy = dataset.get_panchromatic(subset[0].unsqueeze(0))
+    Pan_noisy = dataset.get_panchromatic(subset[0].unsqueeze(0), noise=args.noise_panchromatic)
 
     root.create_dataset('hsi_noise', data=Hsi_noisy.cpu().numpy())
     root.create_dataset('pan_noise ', data=Pan_noisy.cpu().numpy())
@@ -212,7 +213,7 @@ if __name__ == "__main__":
         #  simulate_low_res_hsi image + noise 
         Y_H = dataset.simulate_low_res_hsi(data.unsqueeze(0)).to(device=device,dtype=dtype)
         # get_panchromatic image + noise 
-        Y_M = dataset.get_panchromatic(data.unsqueeze(0)).to(device=device,dtype=dtype)
+        Y_M = dataset.get_panchromatic(data.unsqueeze(0), noise=args.noise_panchromatic).to(device=device,dtype=dtype)
 
         optim = PANTVCB(
                     A=A,
