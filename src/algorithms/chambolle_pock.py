@@ -159,9 +159,9 @@ class ChambollePock(nn.Module):
             
             u_old = torch.clone(u)
 
-            q = self.prox_sigma_g_conj(q +  sigma * self.K(v,**params['K']), sigma, **params['prox_sigma_g_conj'])
+            q = self.prox_sigma_g_conj(q + sigma * self.K(v,**params['K']), sigma, **params['prox_sigma_g_conj'])
             
-            u = self.prox_tau_f(u -  tau * self.K_adjoint(q, **params['K_adjoint']), tau, **params['prox_tau_f'])
+            u = self.prox_tau_f(u - tau * self.K_adjoint(q, **params['K_adjoint']), tau, **params['prox_tau_f'])
 
             if self.accelerate:
                 self.theta = 1/sqrt(1 + 2 * self.gamma * tau)

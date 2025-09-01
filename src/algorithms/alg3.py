@@ -1,7 +1,7 @@
 import torch
 from nabla import nabla
 from pan_gradient_prox import PANProximalGradient
-from tv_grad import TVGradAlignment
+from grad_tv import TVGradAlignment
 
 class PANTVGradAlignment(PANProximalGradient):
     """
@@ -20,6 +20,7 @@ class PANTVGradAlignment(PANProximalGradient):
         params['p'] = self.p
         params['q'] = self.q
         params['r'] = self.r
+        params['alpha'] = self.alpha
 
         self.optim = TVGradAlignment(**params)
         # Assurez-vous que W est initialisé
@@ -118,6 +119,9 @@ class PANTVGradAlignment(PANProximalGradient):
         """
         U = self.Aadj(Y_H).clone()
         cost_history = []
+        c = Y_H.shape[1]   # nombre de bandes
+        L = 1.0 + self.lmbda_m * (1.0 / c)
+        self.alpha = 1.0/L
         
         if self.verbose:
             print("\nDébut de l'optimisation:")
@@ -130,7 +134,8 @@ class PANTVGradAlignment(PANProximalGradient):
             
             # Étape de gradient
             grad = self.grad_f(U, Y_H, Y_M)
-            U = self.proxg(U - self.lmbda * grad)
+            y = U - self.alpha * grad
+            U = self.proxg(y)
             
             # Calcul des métriques
             total_cost,data_term_h,data_term_m,tv_term = self.compute_cost(U, Y_H, Y_M)

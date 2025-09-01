@@ -134,7 +134,6 @@ class GradProj(nn.Module):
             t_prev = t
             t = (1 + np.sqrt(1 + 4 * t**2)) / 2
             y = w + ((t_prev - 1) / t) * (w - w_prev)
-            
             # Critère de convergence
             if self.convergence_criteria(w, w_prev):
                 break

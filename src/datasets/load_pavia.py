@@ -20,7 +20,7 @@ def load_pavia(hsi_filename: str = "PaviaU.mat"):
     """
     # Load hyperspectral data
     hsi_mat = loadmat(hsi_filename)
-    hsi_data = torch.tensor(hsi_mat['paviaU'], dtype=torch.float32).swapaxes(-1,0).swapaxes(1,2).unsqueeze(0)
+    hsi_data = torch.tensor(hsi_mat['pavia'], dtype=torch.float32).swapaxes(-1,0).swapaxes(1,2).unsqueeze(0)
 
     
 

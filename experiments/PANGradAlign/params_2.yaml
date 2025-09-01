@@ -4,39 +4,64 @@ fixed_args:
     '--cuda_avail': True
     '--dtype': 'float32'
     '--seed': 42
-    '--max_iter': 30
+    '--max_iter': 200
     '--tol': 1e-12
     '--image_idx': [17]
     '--crop_center': True
-    '--crop_size': 128
-    '--noise_level': 0.001
-    '--sigma': 0.1
+    '--crop_size': 256
+    '--sigma': 500
     '--scale': 4
-    '--lmbda': 1e-4
-    '--lmbda_m': 2
-    '--max_iter_cp' : 10
-    '--alpha' : 1
-    '--threshold_type' : 'soft'   
-    '--threshold_param' : 10
+    '--lmbda_m': 5
+    '--max_iter_cp' : 50
+    '--threshold_type' : 'hard'   
+    '--threshold_param' : 1e-7
+    '--p': "inf"
+    '--q': 1
+    '--r': 1
+        
+
 
 
 
 varying_args:
+    range:
+        options:
+            '--noise_level': [100,1000,400]
+            
+            
+            
 
+            
     groups: 
         - options: 
-            '--p': 1
-            '--q': 1  
-            '--r': 1
+            '--lmbda': 0.0001
         - options: 
-            '--p': 2
-            '--q': 1  
-            '--r': 1
+            '--lmbda': 0.0002
         - options: 
-            '--p': 2
-            '--q': 2  
-            '--r': 1
+            '--lmbda': 0.0004
         - options: 
-            '--p': "inf"
-            '--q': 1  
-            '--r': 1
+            '--lmbda': 0.0006
+        - options: 
+            '--lmbda': 0.0008
+        - options: 
+            '--lmbda': 0.001
+        - options: 
+            '--lmbda': 0.002
+        - options: 
+            '--lmbda': 0.004
+        - options: 
+            '--lmbda': 0.006
+        - options: 
+            '--lmbda': 0.008
+        - options: 
+            '--lmbda': 0.01 
+        - options: 
+            '--lmbda': 0.02
+        - options: 
+            '--lmbda': 0.04
+        - options: 
+            '--lmbda': 0.06
+        - options: 
+            '--lmbda': 0.08     
+
+        

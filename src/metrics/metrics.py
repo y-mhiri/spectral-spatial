@@ -32,7 +32,6 @@ def SSIME(A,B):
     m = SSIM()
     return m(B,A)
 
-
 def compute_metrics(gt,est, numpy=False):
 
     if numpy==True:

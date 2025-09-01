@@ -1,11 +1,10 @@
 import sys
 import os 
 
-path = "/home/ndiayem/Documents/spectral-spatial/src"
-sys.path.append(f'{path}/algorithms')
-sys.path.append(f'{path}/datasets')
-sys.path.append(f'{path}/metrics')
-
+path = os.path.join(os.getenv("HOME"), 'spectral-spatial/src')
+sys.path.append(os.path.join(path, 'datasets'))
+sys.path.append(os.path.join(path, 'algorithms'))
+sys.path.append(os.path.join(path, 'metrics'))
 print(sys.path)
 import argparse
 import torch
@@ -14,7 +13,7 @@ import time
 
 import matplotlib.pyplot as plt
 from pansharpening import PANDataset
-from alg1 import PANTVGradProj
+from alg2 import PANTVCB
 from torchvision import transforms
 from math import sqrt
 import yaml
@@ -36,11 +35,13 @@ if __name__ == "__main__":
     parser.add_argument("--dtype", type=str, default="float32")
 
     parser.add_argument("--storage_path", type=str, required=True)
-    parser.add_argument("--dataset_path", type=str, required=True)
+    parser.add_argument("--dataset_path", type=str, default="/home/ndiayem/Documents/spectral-spatial/data/harvard.zarr")
 
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_iter", type=int, default=100)
-    parser.add_argument("--max_iter_gp", type=int, default=100)
+    parser.add_argument("--max_iter_cp", type=int, default=100)
+    parser.add_argument("--sigma_cp", type=float, default=2.0)
+    parser.add_argument("--theta_cp", type=float, default=1.0)
     
 
     parser.add_argument("--tol", type=float, default=1e-12)
@@ -50,8 +51,8 @@ if __name__ == "__main__":
     parser.add_argument("--crop_size", type=int, default=256)
 
     parser.add_argument("--lmbda", type=float, required=True)
+    parser.add_argument("--alpha", type=float, required=True)
     parser.add_argument("--lmbda_m", type=float, required=True)
-    parser.add_argument("--tau", type=float, required=True)
     parser.add_argument("--p", type=float, required=True)
     parser.add_argument("--q", type=float, required=True)
     parser.add_argument("--r", type=float, required=True)
@@ -106,22 +107,29 @@ if __name__ == "__main__":
     noise_level = args.noise_level
     sigma = args.sigma
     scale = args.scale
-    
+
+      
 
     # CTV hyperparameters
 
     ## global
     max_iter = args.max_iter
-    max_iter_gp = args.max_iter_gp
     tol = args.tol
 
     ## lambda_tv ,lambda_m , p , q et r
     lmbda = args.lmbda
+    alpha = args.alpha
     lmbda_m = args.lmbda_m
-    tau = args.tau
     p = args.p
     q = args.q 
     r = args.r
+
+
+    # CP params
+
+    sigma_cp = args.sigma_cp
+    theta_cp  = args.theta_cp
+    max_iter_cp = args.max_iter_cp
     ###################################################
     ###################################################
 
@@ -142,12 +150,11 @@ if __name__ == "__main__":
     
     crop_transform = transforms.Compose([transforms.CenterCrop(crop_size)])
     if crop:
-        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma/(crop_size**2),sigma1 = noise_level/(crop_size**2),device=device,size=crop_size,seed =seed)
+        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=crop_transform,normalize=True,scale= scale,sigma= sigma/(crop_size*crop_size),sigma1 = noise_level/(crop_size*crop_size),device=device,size=crop_size,seed =seed)
     else:
-        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=None,normalize=True,scale= scale,sigma= sigma/(crop_size**2),sigma1 = noise_level/(crop_size**2),device=device,size=None,seed =seed)
+        dataset = dataset =PANDataset(root_dir=data_path, split='train' ,transform=None,normalize=True,scale= scale,sigma= sigma,sigma1 = noise_level,device=device,size=None,seed =seed)
 
     subset = torch.utils.data.Subset(dataset, data_idx)
-
 
     # Operators parameters 
     A,A_adj, R, R_adj = dataset.get_operators()
@@ -183,6 +190,15 @@ if __name__ == "__main__":
     root.attrs['device'] = device
     root.attrs['seed'] = seed
 
+    # parametre chambolle 
+    params = {
+    'max_iter': max_iter_cp,         # niters → max_iter (nom attendu par TVPrior)
+    'lmbda': lmbda,          # paramètre supplémentaire
+    'theta': theta_cp ,            # paramètre de régularisation
+    'sigma': sigma_cp,                  # sigma = gain (gain=2)   
+    'tau': 0.99/sigma_cp              # tau = 0.99 / gain (calculé)             
+    }
+
 
     metrics = {}
     reconstructed_ar = torch.zeros([len(subset), dataset.nband, crop_size, crop_size], device=device, dtype=dtype)
@@ -198,27 +214,26 @@ if __name__ == "__main__":
         # get_panchromatic image + noise 
         Y_M = dataset.get_panchromatic(data.unsqueeze(0)).to(device=device,dtype=dtype)
 
-        optim = PANTVGradProj(
+        optim = PANTVCB(
                     A=A,
                     Aadj=A_adj,
                     spectral_op = R,
                     spectral_op_t = R_adj,
                     max_iter=max_iter,
                     lmbda=lmbda,
+                    alpha = alpha,
                     lmbda_m=lmbda_m,
-                    tau = tau,
                     tol=tol,
                     scale=dataset.scale,
-                    max_iter_gp = max_iter_gp,
                     p = p,
                     q = q,
                     r = r,
-                    verbose=True)
+                    verbose=True,
+                    params = params)
 
 
         start_time = time.time()
 
-        ## Faire une PCA
         
         reconstructed, loss = optim(Y_H,Y_M)
         
@@ -257,13 +272,10 @@ if __name__ == "__main__":
                 'lambda': lmbda,
                 'lambda_m': lmbda_m,
                 'max_iter' : max_iter,
-                'max_iter_gp' : max_iter_gp,
-                'tau' : tau,
                 'p': p,
                 'q': q,
                 'r': r,
                 'noise_level': noise_level,
-                'sigma': sigma,
                 'scale': scale
             }
         }
@@ -274,4 +286,5 @@ if __name__ == "__main__":
     
     
     print(f"All done here.")
+
 

@@ -1,10 +1,10 @@
 import sys
 import os
 # Chemin des modules
-path = "/home/ndiayem/Documents/spectral-spatial/src"
-sys.path.append(f'{path}/algorithms')
-sys.path.append(f'{path}/datasets')
-sys.path.append(f'{path}/metrics')
+path = os.path.join(os.getenv("HOME"), 'spectral-spatial/src')
+sys.path.append(os.path.join(path, 'datasets'))
+sys.path.append(os.path.join(path, 'algorithms'))
+sys.path.append(os.path.join(path, 'metrics'))
 
 from pansharpening import PANDataset
 

@@ -1,5 +1,6 @@
 import sys
 import torch
+import math 
 import logging
 import torch.nn as nn
 from tqdm.auto import tqdm
@@ -25,12 +26,13 @@ class PANProximalGradient(nn.Module):
         R (torch.Tensor): Matrice de projection panchromatique
     """
 
-    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, step_size, lmbda, lmbda_m, tol,scale,p,q,r, verbose, init=None):
+    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda,alpha, lmbda_m, tol,scale,p,q,r,verbose):
         super().__init__()
         self.max_iter = max_iter
         self.scale = scale
         self.step_size = step_size
         self.lmbda = lmbda
+        self.alpha = alpha
         self.lmbda_m = lmbda_m
         self.tol = tol
         self.verbose = verbose
@@ -41,9 +43,6 @@ class PANProximalGradient(nn.Module):
         self.p = p
         self.q = q 
         self.r = r
-
-
-        self.init = init
 
         # Configuration du logger simple vers stdout
         self.logger = logging.getLogger('PANProximalGradient')
@@ -56,37 +55,39 @@ class PANProximalGradient(nn.Module):
 
 
 
-    def ctv_norm(self, U,eps=1e-8):
+    def ctv_norm(self, U, eps=1e-8):
         """
-        Calcule la norme CTV l^p,q,r avec support pour p,q,r = infini.
+        Calcule la norme CTV l^{p,q,r} avec support pour p,q,r = infini.
         
         Args:
-            U (torch.Tensor): Tenseur de gradients [b,c,h,w,2]
-            p, q, r (float or torch.inf): Exposants de la norme
+            U (torch.Tensor): Tenseur de gradients [B, C, H, W, 2]
             eps (float): Petite valeur pour stabilité numérique
             
         Returns:
-            torch.Tensor: Norme CTV [b,1,1,1]
+            torch.Tensor: Norme CTV [B,1,1,1]
         """
-        # Norme p sur les canaux (axis=1)
+        # ---- Norme p sur les canaux ----
         if torch.isinf(torch.tensor(self.p)):
             norm_p = torch.amax(torch.abs(U), dim=1, keepdim=True)  # l^infini
         else:
-            norm_p = torch.sum(torch.abs(U)**self.p, dim=1, keepdim=True)**(1/(self.p + eps))
+            norm_p = (torch.sum(torch.abs(U) ** self.p, dim=1, keepdim=True) + eps) ** (1.0 / self.p)
 
-        # Norme q sur les dérivées (axis=-1)
+        # ---- Norme q sur les directions ----
         if torch.isinf(torch.tensor(self.q)):
-            norm_q = torch.amax(torch.abs(norm_p), dim=-1, keepdim=True)  # l^infini
+            norm_q = torch.amax(norm_p, dim=-1, keepdim=True)  # l^infini
         else:
-            norm_q = torch.sum(norm_p**self.q, dim=-1, keepdim=True)**(1/(self.q + eps))
+            norm_q = (torch.sum(norm_p ** self.q, dim=-1, keepdim=True) + eps) ** (1.0 / self.q)
 
-        # Norme r sur les pixels (axis=(2,3))
+        # ---- Norme r sur les pixels ----
         if torch.isinf(torch.tensor(self.r)):
-            norm_r = torch.amax(torch.abs(norm_q), dim=(2,3), keepdim=True)  # l^infini
+            norm_r = torch.amax(norm_q, dim=(2, 3), keepdim=True)  # l^infini
         else:
-            norm_r = torch.sum(norm_q**self.r, dim=(2,3), keepdim=True)**(1/(self.r + eps))
+            norm_r = (torch.sum(norm_q ** self.r, dim=(2, 3), keepdim=True) + eps) ** (1.0 / self.r)
 
+        # ---- Retour : somme totale par image ----
+        #   Dans l'article, CTV = somme sur tous les pixels des normes locales
         return norm_r
+
         
     
     
@@ -156,7 +157,6 @@ class PANProximalGradient(nn.Module):
         grad1 = self.Aadj((self.A(U) - Y_H))
         
         # Terme 2: Gradient de (λ_m/2) ||Y_M - RU||²
-        
         subtracted = self.spectral_op(U) - Y_M
         RT_subtracted = self.spectral_op_t(subtracted)
         grad2 = self.lmbda_m * RT_subtracted
@@ -166,52 +166,45 @@ class PANProximalGradient(nn.Module):
     def proxg(self, x):
         """Opérateur proximal (à implémenter)."""
         raise NotImplementedError("L'opérateur proximal doit être implémenté")
+    
+
         
     def forward(self, Y_H, Y_M):
         """
-        Résout le problème d'optimisation complet.
-        
-        Args:
-            Y_H (torch.Tensor): Données hyperspectrales [b,c,h//scale,w//scale]
-            Y_M (torch.Tensor): Données panchromatiques [b,1,h,w]
-            
-        Returns:
-            tuple: (Image estimée [b,c,h,w], historique des coûts)
+        ISTA simple : U_{k+1} = prox_g(U_k - alpha * grad_f(U_k))
         """
+        # ---- Calcul de L et alpha ----
+        c = Y_H.shape[1]   # nombre de bandes
+        L = 1.0 + self.lmbda_m * (1.0 / c)
+        self.alpha = 1.0 / L
+        self.logger.info(f"[ISTA] L = {L:.6f}  |  alpha = {self.alpha:.6f}")
 
-        if self.init is not None:
-            U = self.init.clone()
-        else:
-            U = self.Aadj(Y_H).clone()
-        cost_history = []
-        
-        # En-tête du tableau
-        self.logger.info("\nDébut de l'optimisation:")
-        self.logger.info(f"{'It':<5} | {'Coût total':<12} | {'Data H':<12} | {'Data M':<12} | {'TV':<12} | {'ΔU':<12}")
-        self.logger.info("-" * 80)
-        
-        cost_history = torch.zeros(self.max_iter)
+        # ---- Initialisation ----
+        U = self.Aadj(Y_H).clone()
+        cost_history = torch.zeros(self.max_iter, device=U.device)
+
         for it in range(self.max_iter):
             U_prev = U.clone()
-            
-            # Étape de gradient
-            grad = self.grad_f(U, Y_H, Y_M)
-            U = self.proxg(U - self.step_size * grad)
-            
-            # Calcul des métriques
-            total_cost,data_term_h,data_term_m,tv_term = self.compute_cost(U, Y_H, Y_M)
-            delta_U = torch.norm(U - U_prev).item() / (torch.norm(U_prev).item() + 1e-8)
-            cost_history[it] = total_cost.item()
-            
-            # Affichage conditionnel
-            if self.verbose:
-                if it % 10 == 0 or it == self.max_iter - 1 or delta_U < self.tol:
-                    log_message = (f"{it:<5} | {total_cost.item():<12.3e} | {data_term_h.item():<12.3e} | "
-                             f"{data_term_m.item():<12.3e} | {tv_term.item():<12.3e} | {delta_U:<12.3e}")
-                    self.logger.info(log_message)
 
-            if delta_U < self.tol:
-                self.logger.info(f"\nConvergence atteinte à l'itération {it} (ΔU = {delta_U:.3e} < {self.tol})")
-                break
-        
+            # Gradient
+            grad = self.grad_f(U, Y_H, Y_M)
+
+            # Mise à jour ISTA
+            U = self.proxg(U - self.alpha * grad)
+
+            # Calcul du coût
+            total_cost, data_term_h, data_term_m, tv_term = self.compute_cost(U, Y_H, Y_M)
+            cost_history[it] = total_cost.item()
+
+            # Critère d'arrêt
+            delta_U = torch.norm(U - U_prev).item() / (torch.norm(U_prev).item() + 1e-8)
+            if it % 10 == 0 or delta_U < self.tol:
+                self.logger.info(
+                    f"{it:<5} | {total_cost.item():<12.3e} | {data_term_h.item():<12.3e} | "
+                    f"{data_term_m.item():<12.3e} | {tv_term.item():<12.3e} | {delta_U:<12.3e}"
+                )
+                if delta_U < self.tol:
+                    break
+
         return U, cost_history
+
