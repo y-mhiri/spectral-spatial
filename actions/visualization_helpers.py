@@ -130,7 +130,7 @@ def generate_filename(metadata, image_type, img_idx=0, extension='png'):
     noise = extract_parameter_value(metadata, 'noise_level', 0)
     
     # Get PSNR if available
-    psnr_values = extract_metric_value(metadata, 'psnr')
+    psnr_values = extract_metric_value(metadata, 'PSNR')
     psnr = np.mean(psnr_values) if psnr_values else 0
     
     # Format filename

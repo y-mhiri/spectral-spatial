@@ -54,15 +54,22 @@ def quick_summary(experiment_dir):
     # Memory estimate
     mem_est = get_memory_usage_estimate(all_metadata)
     print(f"\nMEMORY ESTIMATE: {mem_est['estimated_gb']:.2f} GB if all arrays loaded")
+    print(f"\nMEMORY ESTIMATE: {mem_est['estimated_mb']:.2f} MB if all arrays loaded")
     
     return True
 
 def main():
     parser = argparse.ArgumentParser(description='Quick experiment summary')
-    parser.add_argument('--experiment_dir', type=str, required=True)
+    parser.add_argument('--storage_path', type=str, required=True)
+    parser.add_argument('--experiment_dir', type=str, default=None)
     args = parser.parse_args()
     
-    success = quick_summary(args.experiment_dir)
+    if args.experiment_dir is None:
+        experiment_dir = os.path.join(*args.storage_path.split('/')[0:-1])
+    else:
+        experiment_dir = args.experiment_dir
+
+    success = quick_summary(experiment_dir)
     sys.exit(0 if success else 1)
 
 if __name__ == "__main__":

@@ -133,7 +133,7 @@ def main():
     save_experiment_info(args.storage_path, args, total_time, metrics, args.algorithm)
     
     print(f"Experiment completed in {total_time:.2f}s")
-    print(f"Average PSNR: {sum(metrics.get('psnr', [0]))/len(metrics.get('psnr', [1])):.2f}")
+    print(f"Average PSNR: {sum(metrics.get('PSNR', [0]))/len(metrics.get('psnr', [1])):.2f}")
 
 if __name__ == "__main__":
     main()

@@ -2,92 +2,174 @@
 import argparse
 import sys
 import os
+import torch
+import numpy as np
+
 sys.path.append(os.path.dirname(__file__))
 from loaders import *
 from visualization_helpers import *
 
+setup_paths()
+from experiment_helpers import create_dataset, setup_device_and_dtype
+
+
 def get_rgb_indices(dataset_path):
     """Get RGB band indices for dataset"""
-    # This is dataset-specific - you may need to adjust
     rgb_indices_map = {
-        'harvard': [29, 19, 9],  # Approximate RGB bands for Harvard dataset
-        'pavia': [55, 41, 12],   # Example for Pavia
-        'default': [0, 1, 2]     # Fallback
+        'harvard': [29, 19, 9],
+        'pavia': [55, 41, 12],
+        'default': [0, 1, 2]
     }
-    
     dataset_name = os.path.basename(dataset_path).split('.')[0].lower()
     return rgb_indices_map.get(dataset_name, rgb_indices_map['default'])
 
-def visualize_group(metadata, types, target_size, output_dir, img_indices=None):
-    """Visualize results from a single group"""
+def load_all_image_data(metadata):
+    """Load all image data (ground truth, reconstructed, noisy) for a group"""
+    
+    class Args:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+    
+    args = Args(**metadata.get('parameters', {}))
+    
+    # Load dataset for ground truth and noisy images
+    device, dtype = setup_device_and_dtype(args)
+    dataset = create_dataset(args, device, dtype)
+    
+    image_idx = getattr(args, 'image_idx', [0])
+    if not isinstance(image_idx, list):
+        image_idx = [image_idx]
+    
+    subset = torch.utils.data.Subset(dataset, image_idx)
+    
+    # Load reconstructed arrays from zarr
     group_path = metadata['group_path']
-    
-    # Load arrays for this group
-    available_arrays = []
-    if 'reconstructed_shape' in metadata.get('zarr_metadata', {}):
-        available_arrays.append('reconstructed')
-    if 'loss_shape' in metadata.get('zarr_metadata', {}):
-        available_arrays.append('loss')
-    
-    arrays_data = load_zarr_arrays(group_path, available_arrays)
-    
-    # Get dataset info for RGB indices
-    dataset_path = metadata.get('parameters', {}).get('dataset_path', '')
-    rgb_indices = get_rgb_indices(dataset_path)
-    
-    # Load ground truth if needed
-    ground_truth_data = None
-    if 'groundtruth' in types or 'comparison' in types:
-        # We need to reconstruct ground truth from dataset
-        # This requires dataset loading - simplified here
-        pass
-    
-    # Process each image index
-    if img_indices is None:
+    reconstructed_data = None
+    try:
+        arrays_data = load_zarr_arrays(group_path, ['reconstructed'])
         if 'reconstructed' in arrays_data:
-            img_indices = range(arrays_data['reconstructed'].shape[0])
-        else:
-            img_indices = [0]
+            reconstructed_data = arrays_data['reconstructed']
+    except Exception as e:
+        print(f"Could not load reconstructed data: {e}")
     
-    for img_idx in img_indices:
-        images_to_process = {}
+    # Generate ground truth and noisy images
+    all_data = {
+        'groundtruth': [],
+        'hsi_noisy': [],
+        'pan_noisy': [],
+        'reconstructed': []
+    }
+    
+    for idx in range(len(subset)):
+        gt_tensor = subset[idx]
+        gt_batch = gt_tensor.unsqueeze(0)
         
-        # Extract different image types
-        if 'reconstructed' in types and 'reconstructed' in arrays_data:
-            recon = arrays_data['reconstructed'][img_idx]  # [bands, H, W]
-            
-            if 'rgb' in types:
-                rgb_recon = extract_rgb_image(recon, rgb_indices)
-                filename = generate_filename(metadata, 'rgb_reconstructed', img_idx)
-                filepath = os.path.join(output_dir, filename)
-                save_image(rgb_recon, filepath, target_size)
-                print(f"Saved: {filename}")
-            
-            if 'eigenimage' in types:
-                eigen_recon = extract_eigenimage_rgb(recon)
-                filename = generate_filename(metadata, 'eigenimage_reconstructed', img_idx)
-                filepath = os.path.join(output_dir, filename)
-                save_image(eigen_recon, filepath, target_size)
-                print(f"Saved: {filename}")
-            
-            if 'bands' in types:
-                # Save first few bands as grayscale
-                for band_idx in [0, 10, 20, 30]:
-                    if band_idx < recon.shape[0]:
-                        band_img = extract_band_image(recon, band_idx)
-                        filename = generate_filename(metadata, f'band{band_idx}_reconstructed', img_idx)
-                        filepath = os.path.join(output_dir, filename)
-                        save_image(band_img, filepath, target_size)
-                
-                print(f"Saved bands for image {img_idx}")
+        # Ground truth
+        all_data['groundtruth'].append(gt_tensor.cpu().numpy())
         
-        # Add ground truth and comparison logic here when needed
-        # This would require loading original dataset
+        # Noisy HSI (low resolution)
+        hsi_noisy = dataset.simulate_low_res_hsi(gt_batch)[0].cpu().numpy()
+        all_data['hsi_noisy'].append(hsi_noisy)
+        
+        # Noisy panchromatic
+        pan_noisy = dataset.get_panchromatic(gt_batch, noise=True)[0].cpu().numpy()
+        all_data['pan_noisy'].append(pan_noisy)
+        
+        # Reconstructed (if available)
+        if reconstructed_data is not None and idx < reconstructed_data.shape[0]:
+            all_data['reconstructed'].append(reconstructed_data[idx])
+    
+    return all_data, getattr(args, 'algorithm', 'Unknown')
 
-def visualize_experiment(experiment_dir, groups, types, layout, target_size, img_indices):
-    """Visualize results from experiment"""
+def save_visualization_set(image_data, group_num, img_idx, algorithm, rgb_indices, output_dir):
+    """Save complete visualization set for one image"""
+    
+    viz_types = ['rgb', 'eigenimage']
+    image_sources = ['groundtruth', 'hsi_noisy', 'reconstructed']
+    
+    for viz_type in viz_types:
+        for source in image_sources:
+            if source in image_data and len(image_data[source]) > img_idx:
+                data = image_data[source][img_idx]
+                
+                # Extract visualization
+                if viz_type == 'rgb':
+                    img = extract_rgb_image(data, rgb_indices)
+                elif viz_type == 'eigenimage':
+                    img = extract_eigenimage_rgb(data)
+                
+                # Generate filename
+                filename = f"{group_num:03d}_{img_idx}_{algorithm}_{viz_type}_{source}.png"
+                filepath = os.path.join(output_dir, filename)
+                
+                # Save image
+                save_image(img, filepath)
+    
+    # Save panchromatic if available
+    if 'pan_noisy' in image_data and len(image_data['pan_noisy']) > img_idx:
+        pan_data = image_data['pan_noisy'][img_idx]
+        
+        # Handle 3D panchromatic (squeeze if needed)
+        if pan_data.ndim == 3 and pan_data.shape[0] == 1:
+            pan_data = pan_data[0]
+        
+        # Normalize and save
+        normalized_pan = normalize_image(pan_data)
+        filename = f"{group_num:03d}_{img_idx}_{algorithm}_pan_noisy.png"
+        filepath = os.path.join(output_dir, filename)
+        save_image(normalized_pan, filepath)
+
+def visualize_group(metadata, output_dir):
+    """Generate all visualizations for one group"""
+    # Extract group number from path
+    group_name = os.path.basename(metadata['group_path'])
+    group_num = int(group_name.split('_')[1]) if group_name.startswith('group_') else 0
+    
+    print(f"Processing group {group_num}...")
+    
+    try:
+        # Load all image data
+        image_data, algorithm = load_all_image_data(metadata)
+        
+        # Get dataset path for RGB indices
+        dataset_path = extract_parameter_value(metadata, 'dataset_path', '')
+        rgb_indices = get_rgb_indices(dataset_path)
+        print(rgb_indices)
+        # Determine number of images to process
+        num_images = len(image_data.get('groundtruth', []))
+        
+        # Generate visualizations for each image
+        for img_idx in range(num_images):
+            save_visualization_set(image_data, group_num, img_idx, algorithm, 
+                                 rgb_indices, output_dir)
+        
+        print(f"  Saved {num_images} image sets")
+        
+    except Exception as e:
+        print(f"  Error processing group {group_num}: {e}")
+
+def main():
+    parser = argparse.ArgumentParser(description='Generate visualization images for experiment')
+    parser.add_argument('--experiment_dir', type=str, default=None,
+                       help='Experiment directory containing results')
+    parser.add_argument('--storage_path', type=str, required=True)                       
+    parser.add_argument('--groups', type=int, nargs='+',
+                       help='Specific group numbers to visualize (default: all successful)')
+    parser.add_argument('--algorithm', type=str,
+                       help='Filter by algorithm name')
+    
+
+
+    args = parser.parse_args()
+
+    if args.experiment_dir is None:
+        experiment_dir = os.path.join(*args.storage_path.split('/')[0:-1])
+    else:
+        experiment_dir = args.experiment_dir
+    
     print("="*60)
-    print(" CUSTOM VISUALIZATION")
+    print(" VISUALIZATION GENERATOR")
     print("="*60)
     
     # Load metadata
@@ -96,25 +178,31 @@ def visualize_experiment(experiment_dir, groups, types, layout, target_size, img
     
     if not successful:
         print("No successful runs found")
-        return False
+        return
+    
+    # Filter by algorithm if specified
+    if args.algorithm:
+        successful = filter_by_algorithm(successful, args.algorithm)
+        print(f"Filtered to {args.algorithm} algorithm")
     
     # Filter by groups if specified
-    if groups:
-        filtered_metadata = []
+    if args.groups:
+        filtered = []
         for metadata in successful:
             group_name = os.path.basename(metadata['group_path'])
             if group_name.startswith('group_'):
                 try:
                     group_num = int(group_name.split('_')[1])
-                    if group_num in groups:
-                        filtered_metadata.append(metadata)
+                    if group_num in args.groups:
+                        filtered.append(metadata)
                 except ValueError:
                     continue
-        successful = filtered_metadata
+        successful = filtered
+        print(f"Processing groups: {args.groups}")
     
     if not successful:
-        print(f"No matching groups found: {groups}")
-        return False
+        print("No matching groups found")
+        return
     
     print(f"Processing {len(successful)} groups...")
     
@@ -123,80 +211,15 @@ def visualize_experiment(experiment_dir, groups, types, layout, target_size, img
     os.makedirs(output_dir, exist_ok=True)
     
     # Process each group
-    for i, metadata in enumerate(successful):
-        print(f"\nProcessing group {i+1}/{len(successful)}")
-        try:
-            visualize_group(metadata, types, target_size, output_dir, img_indices)
-        except Exception as e:
-            print(f"Error processing group: {e}")
-            continue
+    for metadata in successful:
+        visualize_group(metadata, output_dir)
     
-    print(f"\nVisualization complete. Results in: {output_dir}")
-    return True
-
-def main():
-    parser = argparse.ArgumentParser(description='Custom visualization of experiment results')
-    
-    # Core arguments
-    parser.add_argument('--experiment_dir', type=str, required=True,
-                       help='Experiment directory containing results')
-    
-    # Selection arguments
-    parser.add_argument('--groups', type=int, nargs='+', 
-                       help='Specific group numbers to visualize')
-    parser.add_argument('--algorithm', type=str,
-                       help='Filter by algorithm name')
-    parser.add_argument('--best', type=int,
-                       help='Show N best performing groups')
-    
-    # Visualization options
-    parser.add_argument('--types', nargs='+', 
-                       choices=['rgb', 'eigenimage', 'bands', 'reconstructed', 'groundtruth', 'comparison'],
-                       default=['rgb', 'reconstructed'],
-                       help='Types of visualizations to generate')
-    
-    parser.add_argument('--layout', choices=['separate', 'grid'], default='separate',
-                       help='Layout for multiple images')
-    
-    parser.add_argument('--target_size', type=int,
-                       help='Target image size (default: original size)')
-    
-    parser.add_argument('--img_indices', type=int, nargs='+',
-                       help='Specific image indices to visualize')
-    
-    args = parser.parse_args()
-    
-    # Process selection
-    groups = args.groups
-    if args.best:
-        # Load metadata and find best groups
-        all_metadata = load_experiment_metadata(args.experiment_dir)
-        if args.algorithm:
-            all_metadata = filter_by_algorithm(all_metadata, args.algorithm)
-        
-        successful = filter_successful_runs(all_metadata)
-        
-        # Sort by PSNR and take top N
-        groups_with_psnr = []
-        for metadata in successful:
-            psnr_vals = extract_metric_value(metadata, 'psnr')
-            if psnr_vals:
-                avg_psnr = np.mean(psnr_vals)
-                group_name = os.path.basename(metadata['group_path'])
-                if group_name.startswith('group_'):
-                    try:
-                        group_num = int(group_name.split('_')[1])
-                        groups_with_psnr.append((group_num, avg_psnr))
-                    except ValueError:
-                        continue
-        
-        groups_with_psnr.sort(key=lambda x: x[1], reverse=True)
-        groups = [g[0] for g in groups_with_psnr[:args.best]]
-        print(f"Selected best {len(groups)} groups: {groups}")
-    
-    success = visualize_experiment(args.experiment_dir, groups, args.types, 
-                                 args.layout, args.target_size, args.img_indices)
-    sys.exit(0 if success else 1)
+    print(f"\nVisualization complete!")
+    print(f"Results saved to: {output_dir}")
+    print(f"\nGenerated images:")
+    print("- RGB and eigenimage versions of ground truth, reconstructed, and noisy HSI")
+    print("- Panchromatic noisy images")
+    print("- Files named: {group}_{img}_{algorithm}_{viz_type}_{source}.png")
 
 if __name__ == "__main__":
     main()

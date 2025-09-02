@@ -1,3 +1,4 @@
+import sys
 import zarr
 import numpy as np
 import pandas as pd
@@ -5,6 +6,15 @@ import yaml
 import os
 from glob import glob
 from pathlib import Path
+
+def setup_paths():
+    """Setup system paths for imports"""
+    path = os.path.join(os.getenv("HOME_DATA"), 'spectral-spatial/src')
+    sys.path.append(os.path.join(path, 'datasets'))
+    sys.path.append(os.path.join(path, 'algorithms'))
+    sys.path.append(os.path.join(path, 'metrics'))
+    sys.path.append(os.path.join(os.getenv("HOME_DATA"), 'spectral-spatial', 'experiments'))
+
 
 # =============================================================================
 # CORE DATA LOADING FUNCTIONS - MEMORY EFFICIENT
@@ -24,15 +34,15 @@ def find_all_groups(run_path):
 
 def load_group_info(group_path):
     """Load group_info.yaml from a group directory"""
-    group_info_path = os.path.join(group_path, "group_info.yaml")
+    group_info_path = os.path.join(group_path, "info.yaml")
     
     if not os.path.exists(group_info_path):
-        raise FileNotFoundError(f"group_info.yaml not found in {group_path}")
+        raise FileNotFoundError(f"info.yaml not found in {group_path}")
     
     with open(group_info_path, 'r') as f:
         group_info = yaml.safe_load(f)
     
-    return group_info
+    return group_info['experiment']
 
 def load_zarr_metadata(group_path):
     """Load only metadata (attributes) from results.zarr - LIGHTWEIGHT"""
@@ -101,8 +111,8 @@ def load_group_metadata(group_path):
         }
         
         # Extract parameters for easier access
-        if 'options' in group_info:
-            metadata['parameters'] = group_info['options']
+        if 'parameters' in group_info:
+            metadata['parameters'] = group_info['parameters']
         
         return metadata
         
@@ -309,7 +319,7 @@ def filter_successful_runs(metadata_list):
     
     for metadata in metadata_list:
         # Check if essential metrics exist
-        psnr = extract_metric_value(metadata, 'psnr')
+        psnr = extract_metric_value(metadata, 'PSNR')
         total_time = extract_parameter_value(metadata, 'total_time')
         
         if psnr is not None and total_time is not None:
@@ -447,7 +457,7 @@ def get_reconstructed_images(metadata_list, max_groups=None):
     group_paths = [m['group_path'] for m in metadata_list]
     return load_specific_arrays(group_paths, ['reconstructed'])
 
-def get_best_reconstruction(metadata_list, metric_name='psnr'):
+def get_best_reconstruction(metadata_list, metric_name='PSNR'):
     """Get reconstructed image from best performing group"""
     best_metadata, _ = find_best_parameters(metadata_list, metric_name, maximize=True)
     
@@ -515,7 +525,7 @@ def check_experiment_completion(experiment_dir):
 def get_memory_usage_estimate(metadata_list):
     """Estimate memory usage if all arrays were loaded"""
     total_elements = 0
-    
+
     for metadata in metadata_list:
         if 'zarr_metadata' in metadata:
             # Estimate from shape information
@@ -530,9 +540,12 @@ def get_memory_usage_estimate(metadata_list):
     # Assume float32 (4 bytes per element)
     estimated_bytes = total_elements * 4
     estimated_gb = estimated_bytes / (1024**3)
+    estimated_mb = estimated_bytes / (1024**2)
     
+    print(total_elements)
     return {
         'total_elements': total_elements,
         'estimated_bytes': estimated_bytes,
-        'estimated_gb': estimated_gb
+        'estimated_gb': estimated_gb,
+        'estimated_mb': estimated_mb,
     }

@@ -82,7 +82,8 @@ def compare_groups(experiment_dir, param_name, param_values, metric='psnr'):
 
 def main():
     parser = argparse.ArgumentParser(description='Compare parameter groups')
-    parser.add_argument('--experiment_dir', type=str, required=True)
+    parser.add_argument('--experiment_dir', type=str, default=None)
+    parser.add_argument('--storage_path', type=str, required=True)
     parser.add_argument('--param_name', type=str, required=True)
     parser.add_argument('--param_values', nargs='+', required=True, 
                        help='Parameter values to compare')
@@ -90,6 +91,11 @@ def main():
     
     args = parser.parse_args()
     
+    if args.experiment_dir is None:
+        experiment_dir = os.path.join(*args.storage_path.split('/')[0:-1])
+    else:
+        experiment_dir = args.experiment_dir
+
     # Convert param_values to appropriate type
     param_values = []
     for val in args.param_values:
@@ -101,7 +107,7 @@ def main():
         except ValueError:
             param_values.append(val)  # Keep as string
     
-    success = compare_groups(args.experiment_dir, args.param_name, param_values, args.metric)
+    success = compare_groups(experiment_dir, args.param_name, param_values, args.metric)
     sys.exit(0 if success else 1)
 
 if __name__ == "__main__":

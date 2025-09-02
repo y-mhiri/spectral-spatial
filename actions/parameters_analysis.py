@@ -67,14 +67,20 @@ def analyze_parameters(experiment_dir, param1, param2, metric='psnr', algorithm=
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze parameter effects')
-    parser.add_argument('--experiment_dir', type=str, required=True)
+    parser.add_argument('--experiment_dir', type=str, default=None)
+    parser.add_argument('--storage_path', type=str, required=True)
     parser.add_argument('--param1', type=str, required=True, help='First parameter (e.g., lambda)')
     parser.add_argument('--param2', type=str, required=True, help='Second parameter (e.g., lambda_m)')
-    parser.add_argument('--metric', type=str, default='psnr', help='Metric to analyze')
+    parser.add_argument('--metric', type=str, default='PSNR', help='Metric to analyze')
     parser.add_argument('--algorithm', type=str, help='Filter by algorithm')
-    
+
+    if args.experiment_dir is None:
+        experiment_dir = os.path.join(*args.storage_path.split('/')[0:-1])
+    else:
+        experiment_dir = args.experiment_dir
+
     args = parser.parse_args()
-    success = analyze_parameters(args.experiment_dir, args.param1, args.param2, args.metric, args.algorithm)
+    success = analyze_parameters(experiment_dir, args.param1, args.param2, args.metric, args.algorithm)
     sys.exit(0 if success else 1)
 
 if __name__ == "__main__":

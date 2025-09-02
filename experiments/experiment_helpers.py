@@ -13,6 +13,7 @@ def setup_paths():
     sys.path.append(os.path.join(path, 'datasets'))
     sys.path.append(os.path.join(path, 'algorithms'))
     sys.path.append(os.path.join(path, 'metrics'))
+    sys.path.append(os.path.join(os.getenv("HOME_DATA"), 'spectral-spatial', 'experiments'))
 
 def setup_device_and_dtype(args):
     """Setup device and data type"""
