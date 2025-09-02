@@ -151,8 +151,6 @@ def visualize_group(metadata, output_dir):
 
 def main():
     parser = argparse.ArgumentParser(description='Generate visualization images for experiment')
-    parser.add_argument('--experiment_dir', type=str, default=None,
-                       help='Experiment directory containing results')
     parser.add_argument('--storage_path', type=str, required=True)                       
     parser.add_argument('--groups', type=int, nargs='+',
                        help='Specific group numbers to visualize (default: all successful)')
@@ -163,17 +161,13 @@ def main():
 
     args = parser.parse_args()
 
-    if args.experiment_dir is None:
-        experiment_dir = os.path.join(*args.storage_path.split('/')[0:-1])
-    else:
-        experiment_dir = args.experiment_dir
     
     print("="*60)
     print(" VISUALIZATION GENERATOR")
     print("="*60)
     
     # Load metadata
-    all_metadata = load_experiment_metadata(experiment_dir)
+    all_metadata = load_experiment_metadata(args.storage_path)
     successful = filter_successful_runs(all_metadata)
     
     if not successful:
@@ -207,7 +201,7 @@ def main():
     print(f"Processing {len(successful)} groups...")
     
     # Create output directory
-    output_dir = os.path.join(experiment_dir, 'visualizations')
+    output_dir = os.path.join(args.storage_path, 'visualizations')
     os.makedirs(output_dir, exist_ok=True)
     
     # Process each group

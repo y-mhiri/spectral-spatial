@@ -5,21 +5,21 @@ import os
 sys.path.append(os.path.dirname(__file__))
 from loaders import *
 
-def quick_summary(experiment_dir):
+def quick_summary(storage_path):
     """Generate quick experiment summary"""
     print("="*60)
     print(" EXPERIMENT SUMMARY")
     print("="*60)
     
     # Validate structure
-    valid, msg = validate_experiment_structure(experiment_dir)
+    valid, msg = validate_experiment_structure(storage_path)
     if not valid:
         print(f"ERROR: {msg}")
         return False
     
     # Load metadata
-    all_metadata = load_experiment_metadata(experiment_dir)
-    completion = check_experiment_completion(experiment_dir)
+    all_metadata = load_experiment_metadata(storage_path)
+    completion = check_experiment_completion(storage_path)
     
     print(f"Total Groups: {completion['total_groups']}")
     print(f"Successful: {completion['successful_groups']} ({completion['success_rate']*100:.1f}%)")
@@ -61,15 +61,11 @@ def quick_summary(experiment_dir):
 def main():
     parser = argparse.ArgumentParser(description='Quick experiment summary')
     parser.add_argument('--storage_path', type=str, required=True)
-    parser.add_argument('--experiment_dir', type=str, default=None)
     args = parser.parse_args()
     
-    if args.experiment_dir is None:
-        experiment_dir = os.path.join(*args.storage_path.split('/')[0:-1])
-    else:
-        experiment_dir = args.experiment_dir
 
-    success = quick_summary(experiment_dir)
+
+    success = quick_summary(args.storage_path)
     sys.exit(0 if success else 1)
 
 if __name__ == "__main__":

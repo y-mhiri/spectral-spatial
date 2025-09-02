@@ -11,23 +11,18 @@ actions:
       executable: actions/quick_summary.py
       executable_command: python
       description: Quick summary of run results
-  - noise_analysis:
-      name: noise_analysis
-      executable: actions/noise_analysis.py
+  - visualize_loss:
+      name: visualize_loss
+      executable: actions/analyze_convergence.py
       executable_command: python
-      description: 
-  - compare_groups:
-      name: compare_groups
-      executable: actions/compare_groups.py
+      description: Show loss vs iteration.
+  - visualize_metrics:
+      name: visualize_metrics
+      executable: actions/analyze_metrics.py
       executable_command: python
-      description: 
-  - parameter_analysis:
-      name: parameter_analysis
-      executable: actions/parameter_analysis.py
-      executable_command: python
-      description: 
+      description: Show metrics.
   - visualize_custom:
       name: visualize_custom
       executable: actions/visualize_custom.py
       executable_command: python
-      description: 
+      description: Show reconstructed images.
