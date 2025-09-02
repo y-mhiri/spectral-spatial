@@ -6,14 +6,14 @@ fixed_args:
     '--seed': 42
     '--max_iter': 50
     '--tol': 1e-12
-    '--image_idx': [17]
+    '--image_idx': [17,6]
     '--crop_center': True
     '--crop_size': 64
     '--lmbda': 1e-3
     '--lmbda_m': 5
     '--scale': 4
-    '--sigma': 25  # Adjusted for 64x64 crop
-    '--noise_level': 100
+    '--sigma': 25  # defined relative to image size.
+    '--noise_level': 50
     '--max_iter_cp': 50
     '--alpha': 1.0
     '--alpha1': 1.0
@@ -24,6 +24,7 @@ fixed_args:
     '--r': 1
 
 varying_args:
+
   groups:
     - options:
         '--algorithm': 'PANTVCB'

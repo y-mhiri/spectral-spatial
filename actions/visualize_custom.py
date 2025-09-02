@@ -167,8 +167,7 @@ def main():
     print("="*60)
     
     # Load metadata
-    all_metadata = load_experiment_metadata(args.storage_path)
-    successful = filter_successful_runs(all_metadata)
+    successful = load_experiment_metadata(args.storage_path)
     
     if not successful:
         print("No successful runs found")

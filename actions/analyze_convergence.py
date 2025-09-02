@@ -5,6 +5,7 @@ import zarr
 import matplotlib.pyplot as plt
 import seaborn as sns
 from rich import print
+from loaders import *
 
 sns.set_style('darkgrid')
 plt.rc('font', family='serif')
@@ -95,71 +96,74 @@ def generate_metric_plots(metrics, folder):
         plt.close()
         print(f"[green]Graphique généré : {filename}")
 
-def generate_loss_plot(loss_data, folder):
+def generate_loss_plot(loss_data, metadata, output_dir):
     """Génère la courbe de convergence"""
     if loss_data is None or len(loss_data) == 0:
         return
 
-    plt.figure(figsize=(8, 5))
-    
     # Tracé pour chaque image
     for i, loss in enumerate(loss_data):
+        plt.figure(figsize=(8, 5))
         plt.plot(loss, label=f'Image {i}')
     
-    plt.xlabel('Itérations')
-    plt.ylabel('Fonction de coût (échelle log)')
-    plt.title('Évolution de la fonction de coût')
-    plt.yscale('log')
-    plt.legend()
-    plt.grid(True)
-    
-    # Sauvegarde
-    plt.savefig(os.path.join(folder, 'cost_function.png'), bbox_inches='tight', dpi=300)
-    plt.close()
-    print("[green]Graphique de convergence généré")
+        plt.xlabel('itérations')
+        plt.ylabel('cost function (in log scale)')
+        plt.yscale('log')
+        plt.legend()
+        plt.grid(True)
+        group_num, algorithm = metadata['group_num'],metadata['algorithm']
 
-def analyze_results(zarr_path, output_folder):
-    """Analyse principale des résultats"""
-    try:
-        root = zarr.open(zarr_path, mode='r')
+        filepath = os.path.join(output_dir, f'{group_num:03d}_{i:03d}_{algorithm}_loss.png') 
+        plt.savefig(filepath, bbox_inches='tight', dpi=300)
+        plt.close()
+
+def analyze_results(metadata, output_dir):
+
+    for group_metadata in metadata:
+        group_path = group_metadata["group_path"]
+        group_name = os.path.basename(group_path)
+        group_num = int(group_name.split('_')[1])
         
-        # Création du dossier de sortie
-        os.makedirs(output_folder, exist_ok=True)
-        
-        # Extraction des métriques
-        metrics = {}
-        for k, v in root.attrs.items():
-            if k not in ['lambda', 'lambda_m', 'p', 'q', 'r', 'time']:
-                if isinstance(v, (list, np.ndarray)):
-                    metrics[k] = v
-        
-        # Génération des graphiques
-        if 'loss' in root:
-            generate_loss_plot(root['loss'][:], output_folder)
-        
-        if metrics:
-            generate_latex_table(metrics, output_folder)
-            generate_metric_plots(metrics, output_folder)
-        
-        return True
-    
-    except Exception as e:
-        print(f"[red]Erreur d'analyse : {str(e)}[/red]")
-        return False
+        loss = load_zarr_arrays(group_path, ["loss"])["loss"]
+
+        algorithm = group_metadata["parameters"].get('algorithm','Unkown')
+        filepath = f'{group_num:03d}_{algorithm}'
+        filepath = os.path.join(output_dir,filepath)
+        generate_loss_plot(loss, {'algorithm':algorithm,'group_num':group_num}, output_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--storage_path', required=True, help='Chemin vers les résultats')
-    parser.add_argument('--group', type=int, help='Numéro de groupe')
+    parser.add_argument('--algorithm', type=str,
+                       help='Filter by algorithm name')
+    parser.add_argument('--groups', type=int, nargs='+', help='Numéro de groupe', default=None)
     args = parser.parse_args()
-
-    # Détermination des chemins
-    results_path = os.path.join(args.storage_path, f"group_{args.group}" if args.group else "", "results.zarr")
-    output_folder = os.path.join(args.storage_path, f"group_{args.group}" if args.group else "", "analysis")
-
-    print(f"[bold]Analyse des résultats : {results_path}")
     
-    if analyze_results(results_path, output_folder):
-        print("[bold green]Analyse terminée avec succès!")
-    else:
-        print("[bold red]Échec de l'analyse")
+    
+    successful = load_experiment_metadata(args.storage_path)
+    
+    # Filter by algorithm if specified
+    if args.algorithm:
+        successful = filter_by_algorithm(successful, args.algorithm)
+        print(f"Filtered to {args.algorithm} algorithm")
+     # Filter by groups if specified
+    if args.groups:
+        filtered = []
+        for metadata in successful:
+            group_name = os.path.basename(metadata['group_path'])
+            if group_name.startswith('group_'):
+                try:
+                    group_num = int(group_name.split('_')[1])
+                    if group_num in args.groups:
+                        filtered.append(metadata)
+                except ValueError:
+                    continue
+        successful = filtered
+        print(f"Processing groups: {args.groups}")
+    
+
+    # Create output directory
+    output_dir = os.path.join(args.storage_path, 'losses')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    analyze_results(successful, output_dir)

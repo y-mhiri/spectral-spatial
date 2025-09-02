@@ -72,10 +72,7 @@ def load_zarr_arrays(group_path, arrays=None):
     
     for array_name in arrays:
         if array_name in root:
-            if array_name == 'loss':
-                arrays_data['loss_curves'] = np.array(root['loss'])
-            else:
-                arrays_data[array_name] = np.array(root[array_name])
+            arrays_data[array_name] = np.array(root[array_name])
     
     return arrays_data
 
