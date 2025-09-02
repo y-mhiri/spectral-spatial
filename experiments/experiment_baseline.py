@@ -125,6 +125,7 @@ def main():
             else:
                 metrics[metric] = [sample_metrics[metric]]
         
+        print(metrics)
         torch.cuda.empty_cache()
     
     # Save results
