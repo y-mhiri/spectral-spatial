@@ -1,7 +1,0 @@
-name: PANCTV
-description: 
-path: experiments/
-executable: experiments/experiment_ctv.py
-executable_command: python
-datasets:
-  - harvard
