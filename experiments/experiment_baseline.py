@@ -104,6 +104,14 @@ def main():
                            lmbda_m=args.lmbda_m, tol=args.tol, scale=dataset.scale,
                            p=args.p, q=args.q, r=args.r, verbose=True, params=chambolle_params)
         else:
+
+            grad_panc = nabla(Y_M)
+            chambolle_params.update({
+                'grad_panc': grad_panc,
+                'threshold_type': args.threshold_type,
+                'alpha': args.alpha,
+                'threshold_param': args.threshold_param
+            })
             optim = PANTVGradAlignment(A=A, Aadj=A_adj, spectral_op=R, spectral_op_t=R_adj,
                                      max_iter=args.max_iter, lmbda=args.lmbda, alpha=args.alpha1,
                                      lmbda_m=args.lmbda_m, tol=args.tol, scale=dataset.scale,
@@ -125,7 +133,6 @@ def main():
             else:
                 metrics[metric] = [sample_metrics[metric]]
         
-        print(metrics)
         torch.cuda.empty_cache()
     
     # Save results

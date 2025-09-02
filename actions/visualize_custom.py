@@ -135,7 +135,6 @@ def visualize_group(metadata, output_dir):
         # Get dataset path for RGB indices
         dataset_path = extract_parameter_value(metadata, 'dataset_path', '')
         rgb_indices = get_rgb_indices(dataset_path)
-        print(rgb_indices)
         # Determine number of images to process
         num_images = len(image_data.get('groundtruth', []))
         
