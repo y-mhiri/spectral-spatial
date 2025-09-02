@@ -20,7 +20,7 @@ fixed_args:
     '--theta_cp': 1
     '--sigma_cp': 2
     '--p': 2
-    '--q': 1
+    '--q': 2
     '--r': 1
 
 varying_args:
