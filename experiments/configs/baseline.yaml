@@ -1,0 +1,33 @@
+name: baseline
+description: Verify experimental setup and establish baseline performance
+path: experiments/
+executable: experiments/experiment_baseline.py
+executable_command: python
+datasets:
+  - harvard
+actions:
+  - summary:
+      name: summary
+      executable: actions/quick_summary.py
+      executable_command: python
+      description: Quick summary of run results
+  - noise_analysis:
+      name: noise_analysis
+      executable: actions/noise_analysis.py
+      executable_command: python
+      description: 
+  - compare_groups:
+      name: compare_groups
+      executable: actions/compare_groups.py
+      executable_command: python
+      description: 
+  - parameter_analysis:
+      name: parameter_analysis
+      executable: actions/parameter_analysis.py
+      executable_command: python
+      description: 
+  - visualize_custom:
+      name: visualize_custom
+      executable: actions/visualize_custom.py
+      executable_command: python
+      description: 

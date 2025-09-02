@@ -1,0 +1,43 @@
+fixed_args:
+  options:
+    '--device': 'cpu'
+    '--cuda_avail': True
+    '--dtype': 'float32'
+    '--seed': 42
+    '--max_iter': 25
+    '--tol': 1e-12
+    '--image_idx': [6]
+    '--crop_center': True
+    '--crop_size': 64
+    '--scale': 4
+    '--sigma': 25
+    '--noise_level': 100
+    '--max_iter_cp': 25
+    '--alpha': 1.0
+    '--alpha1': 1.0
+    '--theta_cp': 1
+    '--sigma_cp': 2
+    '--threshold_type': 'soft'
+    '--threshold_param': 1e-7
+    # TODO: Set these based on best results from 02a_coarse_param_sweep_PANTVGradAlign
+    '--lmbda': 1e-3  # UPDATE from coarse sweep results
+    '--lmbda_m': 5   # UPDATE from coarse sweep results
+
+varying_args:
+  groups:
+    - options:
+        '--p': 1
+        '--q': 1
+        '--r': 1
+    - options:
+        '--p': 2
+        '--q': 1
+        '--r': 1
+    - options:
+        '--p': 2
+        '--q': 2
+        '--r': 1
+    - options:
+        '--p': "inf"
+        '--q': 1
+        '--r': 1
