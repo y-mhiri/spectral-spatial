@@ -1,5 +1,5 @@
 import torch
-from deepinv.loss.metric import SSIM
+from deepinv.loss.metric import SSIM as dinv_SSIM
 
 def RNMSE(A,B):
     assert A.shape == B.shape, "A and B must have the same shape"
@@ -27,10 +27,10 @@ def SAM(A,B):
 
     return torch.acos((A*B).sum(dim=1)).mean()
 
-def SSIME(A,B):
+def SSIM(A,B):
     assert A.shape == B.shape ,""" assert A.shape == B.shape, "A and B must have the same shape """
-    m = SSIM()
-    return m(B,A)
+    m = dinv_SSIM()
+    return m(B,A)[0] # attention à ne pas passer des batchs. 
 
 def compute_metrics(gt,est, numpy=False):
 
@@ -39,10 +39,10 @@ def compute_metrics(gt,est, numpy=False):
                 'CC': CC(gt,est).cpu().numpy().tolist(),
                 'PSNR': PSNR(gt,est).cpu().numpy().tolist(),
                 'SAM': SAM(gt,est).cpu().numpy().tolist(),
-                'SSIM': SSIME(gt,est).cpu().numpy().tolist()}
+                'SSIM': SSIM(gt,est).cpu().numpy().tolist()}
 
     return {'RNMSE': RNMSE(gt,est),
             'CC': CC(gt,est),
             'PSNR': PSNR(gt,est),
             'SAM': SAM(gt,est),
-            'SSIM': SSIME(gt,est)}
+            'SSIM': SSIM(gt,est)}
