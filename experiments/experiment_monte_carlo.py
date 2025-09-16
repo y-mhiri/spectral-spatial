@@ -98,7 +98,7 @@ def main():
         
         X = data.unsqueeze(0).to(device=device, dtype=dtype)
         for m in range(args.monte_carlo):
-            torch.manual_seed(args.seed)
+            torch.manual_seed(args.seed + m)
 
             # Prepare data
             Y_H = dataset.simulate_low_res_hsi(data.unsqueeze(0)).to(device=device, dtype=dtype)
