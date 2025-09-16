@@ -1,12 +1,9 @@
 import argparse
 import os
-import zarr
-import glob
-
-import matplotlib.pyplot as plt
 import numpy as np
+import zarr
+import matplotlib.pyplot as plt
 import seaborn as sns
-import pandas as pd
 from rich import print
 
 sns.set_style('darkgrid')
@@ -121,105 +118,48 @@ def generate_loss_plot(loss_data, folder):
     plt.close()
     print("[green]Graphique de convergence généré")
 
-
-
-def fetch_group_results(group_path):
-    # zarr_path, output_folder):
+def analyze_results(zarr_path, output_folder):
     """Analyse principale des résultats"""
     try:
-        zarr_path = os.path.join(group_path, 'results.zarr')
         root = zarr.open(zarr_path, mode='r')
         
         # Création du dossier de sortie
-        # os.makedirs(output_folder, exist_ok=True)
+        os.makedirs(output_folder, exist_ok=True)
         
         # Extraction des métriques
-
-        metadata = root.attrs
-
-        nimages = len(metadata['image_idx'])
-        dfs = []
-        for im in range(nimages):
-
-            p = str(int(metadata['p'])) if metadata['p'] != float('inf') else '\infty'
-            q = str(int(metadata['q'])) if metadata['q'] != float('inf') else '\infty'
-            r = str(int(metadata['r'])) if metadata['r'] != float('inf') else '\infty'
-
-            d = {"noise level" : metadata['noise_level'], 
-                        "method" : metadata["algorithm"]+ " $\ell_{" + p + q + r + "}$" , 
-                        'SSIM': f"{metadata['SSIM'][im]:.2f}", 
-                        'CC' : f"{metadata['CC'][im]:.2f}", 
-                        'SAM' : f"{metadata['SAM'][im]:.2f}",
-                        'PSNR' : f"{metadata['PSNR'][im]:.2f}"
-                        }
-
-
-            dfs.append(pd.DataFrame(d, index=[0]))
-        return dfs
-
+        metrics = {}
+        for k, v in root.attrs.items():
+            if k not in ['lambda', 'lambda_m', 'p', 'q', 'r', 'time']:
+                if isinstance(v, (list, np.ndarray)):
+                    metrics[k] = v
         
+        # Génération des graphiques
+        if 'loss' in root:
+            generate_loss_plot(root['loss'][:], output_folder)
+        
+        if metrics:
+            generate_latex_table(metrics, output_folder)
+            generate_metric_plots(metrics, output_folder)
+        
+        return True
+    
     except Exception as e:
         print(f"[red]Erreur d'analyse : {str(e)}[/red]")
         return False
 
-def analyze_results(storage_path, output_folder):
-
-    groups = glob.glob(os.path.join(storage_path,'group_*'))
-
-    first_group = 0
-    while not os.path.isfile(os.path.join(groups[first_group], 'info.yaml')):
-        first_group += 1
-    df_metrics = fetch_group_results(groups[first_group+1])
-
-    for group_path in groups:
-
-        if os.path.isfile(os.path.join(group_path, 'info.yaml')):
-            dfs = fetch_group_results(group_path)
-            for i, df in enumerate(dfs):
-                df_metrics[i] = pd.concat([df_metrics[i], df], ignore_index=True)
-
-    for i,df in enumerate(df_metrics):
-        create_tabular(df, output_folder, f'metrics_table_{i}.tex')
-
-    return True
-
-def create_tabular(df, output_folder, filename):
-
-    tex_path = os.path.join(output_folder, filename)
-    with open(tex_path, 'w') as f:
-
-        columns = list(df.columns)
-
-        f.write("\\begin{tabular}{|c|" + "|".join(["c"]*len(columns)) + "|}\n")
-        f.write("\\hline\n")
-        f.write(" & ".join(columns) + " \\\\\n")
-        f.write("\\hline\n")
-        
-        for index, row in df.iterrows():
-            f.write(" & ".join(row.astype(str)) + " \\\\\n")
-            f.write("\\hline\n")
-        
-        f.write("\\end{tabular}\n")
-    
-    print(f"[green]Tableau LaTeX généré : {tex_path}")
-
-
-
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--storage_path', required=True, help='Chemin vers les résultats')
-    parser.add_argument('--out', type=str, help='Output folder name (stored in run folder).', default="metrics")
+    parser.add_argument('--group', type=int, help='Numéro de groupe')
     args = parser.parse_args()
+    print(args.group)
     # Détermination des chemins
-    output_folder = os.path.join(args.storage_path, args.out)
+    results_path = os.path.join(args.storage_path, f"group_{args.group}" if args.group is not None else "", "results.zarr")
+    output_folder = os.path.join(args.storage_path, f"group_{args.group}" if args.group is not None else "", "analysis")
 
-    os.makedirs(output_folder, exist_ok=True)
-
-    print(f"[bold]Analyse des résultats : {args.storage_path}")
+    print(f"[bold]Analyse des résultats : {results_path}")
     
-    if analyze_results(args.storage_path, output_folder):
+    if analyze_results(results_path, output_folder):
         print("[bold green]Analyse terminée avec succès!")
     else:
         print("[bold red]Échec de l'analyse")
