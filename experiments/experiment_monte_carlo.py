@@ -31,7 +31,7 @@ def main():
     
     # Data parameters
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--image_idx", nargs="+", type=int, default=[6])
+    parser.add_argument("--image_idx", action='store' ,nargs='+', type=int, default=[6])
     parser.add_argument("--crop_center", type=bool, default=True)
     parser.add_argument("--crop_size", type=int, default=64)
     parser.add_argument("--noise_level", type=float, required=True)
