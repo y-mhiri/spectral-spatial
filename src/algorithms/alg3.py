@@ -129,6 +129,7 @@ class PANTVGradAlignment(PANProximalGradient):
             print("-" * 80)
         
         cost_history = torch.zeros(self.max_iter)
+        relval = torch.zeros(self.max_iter)
         for it in range(self.max_iter):
             U_prev = U.clone()
             
@@ -139,9 +140,9 @@ class PANTVGradAlignment(PANProximalGradient):
             
             # Calcul des métriques
             total_cost,data_term_h,data_term_m,tv_term = self.compute_cost(U, Y_H, Y_M)
-            delta_U = torch.norm(U - U_prev).item() / (torch.norm(U_prev).item() + 1e-8)
+            delta_U = torch.norm(U - U_prev).item() / (torch.norm(U).item() + 1e-8)
             cost_history[it] = total_cost.item()
-            
+            relval[it] = delta_U
             # Affichage conditionnel
             if self.verbose and (it % 10 == 0 or it == self.max_iter - 1 or delta_U < self.tol):
                 
@@ -152,4 +153,4 @@ class PANTVGradAlignment(PANProximalGradient):
                     print(f"\nConvergence atteinte à l'itération {it} (ΔU = {delta_U:.3e} < {self.tol})")
                     break
         
-        return U, cost_history
+        return U, cost_history, relval

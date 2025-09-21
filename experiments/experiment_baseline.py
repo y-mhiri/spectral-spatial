@@ -90,6 +90,7 @@ def main():
     reconstructed_ar = torch.zeros([len(subset), dataset.nband, args.crop_size, args.crop_size], 
                                   device=device, dtype=dtype)
     loss_ar = torch.zeros([len(subset), args.max_iter], device=device, dtype=dtype)
+    relval_ar = torch.zeros([len(subset), args.max_iter], device=device, dtype=dtype)
     total_time = 0
     
     
@@ -123,12 +124,13 @@ def main():
                                      p=args.p, q=args.q, r=args.r, verbose=True, params=chambolle_params)
         
         # Run optimization
-        reconstructed, loss, compute_time = run_optimization(optim, Y_H, Y_M)
+        reconstructed, loss, relval, compute_time = run_optimization(optim, Y_H, Y_M)
         total_time += compute_time
         
         # Store results
         reconstructed_ar[j] = reconstructed
         loss_ar[j] = loss
+        relval_ar[j] = relval
         
         # Compute metrics
         sample_metrics = compute_metrics(gt=X, est=reconstructed, numpy=True)
@@ -141,7 +143,7 @@ def main():
         torch.cuda.empty_cache()
     
     # Save results
-    store_results(root, args, reconstructed_ar, loss_ar, metrics, total_time, args.algorithm)
+    store_results(root, args, reconstructed_ar, loss_ar, relval_arr, metrics, total_time, args.algorithm)
     save_experiment_info(args.storage_path, args, total_time, metrics, args.algorithm)
     
     print(f"Experiment completed in {total_time:.2f}s")

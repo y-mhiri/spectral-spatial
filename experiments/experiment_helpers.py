@@ -72,7 +72,7 @@ def save_experiment_info(out_path, args, total_time, metrics, algorithm_name):
     with open(os.path.join(out_path, 'info.yaml'), 'w') as f:
         yaml.safe_dump(info, f)
 
-def store_results(root, args, reconstructed_ar, loss_ar, metrics, total_time, algorithm_name):
+def store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, total_time, algorithm_name):
     """Store all results in zarr format"""
     # Store attributes
     root.attrs['algorithm'] = algorithm_name
@@ -85,8 +85,9 @@ def store_results(root, args, reconstructed_ar, loss_ar, metrics, total_time, al
         root.attrs[metric] = metrics[metric]
     
     # Store arrays
-    root.create_dataset('reconstructed', data=reconstructed_ar.cpu().numpy())
-    root.create_dataset('loss', data=loss_ar.cpu().numpy())
+    root.create_dataset('reconstructed', data=reconstructed_ar.cpu().numpy(), shape=reconstructed_ar.shape)
+    root.create_dataset('loss', data=loss_ar.cpu().numpy(),shape=loss_ar.shape)
+    root.create_dataset('relval', data=relval_ar.cpu().numpy(),shape=relval_ar.shape)
 
 def run_optimization(optim, Y_H, Y_M):
     """Run optimization and return results with timing"""

@@ -181,6 +181,7 @@ class PANProximalGradient(nn.Module):
         # ---- Initialisation ----
         U = self.Aadj(Y_H).clone()
         cost_history = torch.zeros(self.max_iter, device=U.device)
+        relval = torch.zeros(self.max_iter, device=U.device)
 
         for it in range(self.max_iter):
             U_prev = U.clone()
@@ -196,7 +197,8 @@ class PANProximalGradient(nn.Module):
             cost_history[it] = total_cost.item()
 
             # Critère d'arrêt
-            delta_U = torch.norm(U - U_prev).item() / (torch.norm(U_prev).item() + 1e-8)
+            delta_U = torch.norm(U - U_prev).item() / (torch.norm(U).item() + 1e-8)
+            relval[it] = delta_U
             if it % 10 == 0 or delta_U < self.tol:
                 self.logger.info(
                     f"{it:<5} | {total_cost.item():<12.3e} | {data_term_h.item():<12.3e} | "
@@ -205,5 +207,5 @@ class PANProximalGradient(nn.Module):
                 if delta_U < self.tol:
                     break
 
-        return U, cost_history
+        return U, cost_history, relval
 
