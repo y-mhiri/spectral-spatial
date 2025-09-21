@@ -1,169 +1,136 @@
 import argparse
 import os
-import numpy as np
 import zarr
+import glob
+
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+import pandas as pd
 from rich import print
-from loaders import *
 
 sns.set_style('darkgrid')
 plt.rc('font', family='serif')
 
-def generate_latex_table(metrics, folder):
-    """Génère un tableau LaTeX des métriques brutes"""
-    if not metrics:
+
+
+def generate_loss_plot(loss_data, folder):
+    """Génère la courbe de convergence"""
+    if loss_data is None or len(loss_data) == 0:
         return
 
-    # Trouver le nombre d'images
-    n_images = max(len(v) if isinstance(v, (list, np.ndarray)) else 1 for v in metrics.values())
+    plt.figure(figsize=(8, 5))
+    
+    # Tracé pour chaque image
+    for i, loss in enumerate(loss_data):
+        plt.plot(loss, label=f'Image {i}')
+    
+    plt.xlabel('Itérations')
+    plt.ylabel('Fonction de coût (échelle log)')
+    plt.title('Évolution de la fonction de coût')
+    plt.yscale('log')
+    plt.legend()
+    plt.grid(True)
+    
+    # Sauvegarde
+    plt.savefig(os.path.join(folder, 'cost_function.png'), bbox_inches='tight', dpi=300)
+    plt.close()
+    print("[green]Graphique de convergence généré")
 
-    # Créer le tableau LaTeX
-    tex_path = os.path.join(folder, 'metrics_table.tex')
+
+
+def fetch_group_results(group_path):
+    # zarr_path, output_folder):
+    """Analyse principale des résultats"""
+    try:
+        zarr_path = os.path.join(group_path, 'results.zarr')
+        root = zarr.open(zarr_path, mode='r')
+        
+        losses = root['loss']
+        recons
+        metadata = root.attrs
+
+        nimages = len(metadata['image_idx'])
+        
+        p = str(int(metadata['p'])) if metadata['p'] != float('inf') else 'inf'
+        q = str(int(metadata['q'])) if metadata['q'] != float('inf') else 'inf'
+        r = str(int(metadata['r'])) if metadata['r'] != float('inf') else 'inf'
+        plot_name = f"{metadata['noise_level']}_{metadata["algorithm"]}_l{p}{q}{r}"
+            
+        return losses, plot_name
+
+        
+    except Exception as e:
+        print(f"[red]Erreur d'analyse : {str(e)}[/red]")
+        return False
+
+def get_convergence(losses):
+    
+
+
+def analyze_results(storage_path, output_folder):
+
+    groups = glob.glob(os.path.join(storage_path,'group_*'))
+
+    first_group = 0
+    while not os.path.isfile(os.path.join(groups[first_group], 'info.yaml')):
+        first_group += 1
+
+    losses, plot_name = fetch_group_results(groups[first_group+1])
+    df = get_convergence(losses)
+
+    plot_loss(losses, niter, plot_name)
+    for group_path in groups:
+
+        if os.path.isfile(os.path.join(group_path, 'info.yaml')):
+            losses, plot_name = fetch_group_results(group_path)
+
+            niter = get_convergence(losses)
+            plot_loss(losses, niter, plot_name)
+            
+
+
+    create_tabular(df, output_folder, f'convergence.tex')
+
+    return True
+
+def create_tabular(df, output_folder, filename):
+
+    tex_path = os.path.join(output_folder, filename)
     with open(tex_path, 'w') as f:
-        f.write("\\begin{tabular}{|c|" + "|".join(["c"]*len(metrics)) + "|}\n")
+
+        columns = list(df.columns)
+
+        f.write("\\begin{tabular}{|c|" + "|".join(["c"]*len(columns)) + "|}\n")
         f.write("\\hline\n")
-        f.write("Image & " + " & ".join(metrics.keys()) + " \\\\\n")
+        f.write(" & ".join(columns) + " \\\\\n")
         f.write("\\hline\n")
         
-        for img_idx in range(n_images):
-            row = [str(img_idx)]
-            for metric_name, values in metrics.items():
-                try:
-                    val = values[img_idx] if isinstance(values, (list, np.ndarray)) and len(values) > img_idx else "-"
-                    if isinstance(val, (float, np.floating)):
-                        if metric_name == 'PSNR':
-                            row.append(f"{val:.2f} dB")
-                        elif metric_name == 'SAM':
-                            row.append(f"{val:.4f} rad")
-                        else:
-                            row.append(f"{val:.4f}")
-                    else:
-                        row.append(str(val))
-                except (IndexError, TypeError):
-                    row.append("-")
-            
-            f.write(" & ".join(row) + " \\\\\n")
+        for index, row in df.iterrows():
+            f.write(" & ".join(row.astype(str)) + " \\\\\n")
             f.write("\\hline\n")
         
         f.write("\\end{tabular}\n")
     
     print(f"[green]Tableau LaTeX généré : {tex_path}")
 
-def generate_metric_plots(metrics, folder):
-    """Génère un graphique séparé pour chaque métrique"""
-    if not metrics:
-        return
 
-    for metric_name, values in metrics.items():
-        if not isinstance(values, (list, np.ndarray)) or len(values) == 0:
-            continue
 
-        plt.figure(figsize=(8, 5))
-        
-        # Gestion des valeurs spéciales
-        clean_values = []
-        for v in values:
-            if isinstance(v, (float, int, np.number)):
-                if np.isnan(v):
-                    clean_values.append(0)  # Remplacer NaN si nécessaire
-                else:
-                    clean_values.append(v)
-            else:
-                clean_values.append(0)  # Valeur par défaut
 
-        # Tracé du graphique
-        x = range(len(clean_values))
-        plt.plot(x, clean_values, 'o-', markersize=8, linewidth=2)
-        
-        # Configuration spécifique par métrique
-        if metric_name == 'PSNR':
-            plt.ylabel('dB')
-            plt.ylim(0, 100)  # Plage typique pour PSNR
-        elif metric_name == 'SAM':
-            plt.ylabel('Radians')
-            plt.ylim(0, 3.14)  # Plage 0-π
-        else:
-            plt.ylabel('Valeur')
-
-        plt.xlabel('Index Image')
-        plt.title(f'Évolution de {metric_name}')
-        plt.grid(True)
-        
-        # Sauvegarde
-        filename = f"metric_{metric_name.lower().replace(' ', '_')}.png"
-        plt.savefig(os.path.join(folder, filename), bbox_inches='tight', dpi=300)
-        plt.close()
-        print(f"[green]Graphique généré : {filename}")
-
-def generate_loss_plot(loss_data, metadata, output_dir):
-    """Génère la courbe de convergence"""
-    if loss_data is None or len(loss_data) == 0:
-        return
-
-    # Tracé pour chaque image
-    for i, loss in enumerate(loss_data):
-        plt.figure(figsize=(8, 5))
-        plt.plot(loss, label=f'Image {i}')
-    
-        plt.xlabel('itérations')
-        plt.ylabel('cost function (in log scale)')
-        plt.yscale('log')
-        plt.legend()
-        plt.grid(True)
-        group_num, algorithm = metadata['group_num'],metadata['algorithm']
-
-        filepath = os.path.join(output_dir, f'{group_num:03d}_{i:03d}_{algorithm}_loss.png') 
-        plt.savefig(filepath, bbox_inches='tight', dpi=300)
-        plt.close()
-
-def analyze_results(metadata, output_dir):
-
-    for group_metadata in metadata:
-        group_path = group_metadata["group_path"]
-        group_name = os.path.basename(group_path)
-        group_num = int(group_name.split('_')[1])
-        
-        loss = load_zarr_arrays(group_path, ["loss"])["loss"]
-
-        algorithm = group_metadata["parameters"].get('algorithm','Unkown')
-        filepath = f'{group_num:03d}_{algorithm}'
-        filepath = os.path.join(output_dir,filepath)
-        generate_loss_plot(loss, {'algorithm':algorithm,'group_num':group_num}, output_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--storage_path', required=True, help='Chemin vers les résultats')
-    parser.add_argument('--algorithm', type=str,
-                       help='Filter by algorithm name')
-    parser.add_argument('--groups', type=int, nargs='+', help='Numéro de groupe', default=None)
+    parser.add_argument('--out', type=str, help='Output folder name (stored in run folder).', default="metrics")
     args = parser.parse_args()
-    
-    
-    successful = load_experiment_metadata(args.storage_path)
-    
-    # Filter by algorithm if specified
-    if args.algorithm:
-        successful = filter_by_algorithm(successful, args.algorithm)
-        print(f"Filtered to {args.algorithm} algorithm")
-     # Filter by groups if specified
-    if args.groups:
-        filtered = []
-        for metadata in successful:
-            group_name = os.path.basename(metadata['group_path'])
-            if group_name.startswith('group_'):
-                try:
-                    group_num = int(group_name.split('_')[1])
-                    if group_num in args.groups:
-                        filtered.append(metadata)
-                except ValueError:
-                    continue
-        successful = filtered
-        print(f"Processing groups: {args.groups}")
-    
+    # Détermination des chemins
+    output_folder = os.path.join(args.storage_path, args.out)
 
-    # Create output directory
-    output_dir = os.path.join(args.storage_path, 'losses')
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
+
+    print(f"[bold]Analyse des résultats : {args.storage_path}")
     
-    analyze_results(successful, output_dir)
+    if analyze_results(args.storage_path, output_folder):
+        print("[bold green]Analyse terminée avec succès!")
+    else:
+        print("[bold red]Échec de l'analyse")
