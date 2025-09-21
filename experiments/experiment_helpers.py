@@ -92,9 +92,9 @@ def store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, tot
 def run_optimization(optim, Y_H, Y_M):
     """Run optimization and return results with timing"""
     start_time = time.time()
-    reconstructed, loss = optim(Y_H, Y_M)
+    reconstructed, loss, relval = optim(Y_H, Y_M)
     compute_time = time.time() - start_time
-    return reconstructed, loss, compute_time
+    return reconstructed, loss, relval, compute_time
 
 def print_experiment_info(args, algorithm_name):
     """Print experiment information"""
