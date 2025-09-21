@@ -92,6 +92,7 @@ def main():
     reconstructed_ar = torch.zeros([args.monte_carlo, len(subset), dataset.nband, args.crop_size, args.crop_size], 
                                   device=device, dtype=dtype)
     loss_ar = torch.zeros([args.monte_carlo, len(subset), args.max_iter], device=device, dtype=dtype)
+    relval_ar = torch.zeros([args.monte_carlo, len(subset), args.max_iter], device=device, dtype=dtype)
     total_time = 0
     
     # Run experiments
@@ -133,6 +134,7 @@ def main():
             # Store results
             reconstructed_ar[m,j] = reconstructed
             loss_ar[m,j] = loss
+            relvar_ar[m,j] = relval
         
             # Compute metrics
             sample_metrics = compute_metrics(gt=X, est=reconstructed, numpy=True)
@@ -156,7 +158,7 @@ def main():
     metrics = { k : list(d) for k,d in mean_metrics_df.items()}
 
     # Save results
-    store_results(root, args, reconstructed_ar, loss_ar, metrics, total_time, args.algorithm)
+    store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, total_time, args.algorithm)
     save_experiment_info(args.storage_path, args, total_time, metrics, args.algorithm)
     metrics_df.to_csv(os.path.join(args.storage_path,'metrics.csv'))
 
