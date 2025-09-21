@@ -28,7 +28,7 @@ def main():
     
     # Data parameters
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--image_idx", nargs="+", type=int, default=[6])
+    parser.add_argument("--image_idx", type=str, default="6")
     parser.add_argument("--crop_center", type=bool, default=True)
     parser.add_argument("--crop_size", type=int, default=64)
     parser.add_argument("--noise_level", type=float, required=True)
@@ -61,7 +61,10 @@ def main():
     # Setup
     device, dtype = setup_device_and_dtype(args)
     dataset = create_dataset(args, device, dtype)
-    subset = torch.utils.data.Subset(dataset, args.image_idx)
+
+    image_idx = [int(idx) for idx in args.image_idx.split(' ')]
+
+    subset = torch.utils.data.Subset(dataset, image_idx)
     A, A_adj, R, R_adj = dataset.get_operators()
     
     print_experiment_info(args, args.algorithm)
