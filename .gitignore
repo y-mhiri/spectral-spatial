@@ -9,7 +9,8 @@ __pycache__/
 *.png
 *.pdf
 
-
+*.python-version
+*.toml
 *.yaml
 run_*/
 
