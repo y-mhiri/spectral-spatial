@@ -58,8 +58,6 @@ def main():
     args = parser.parse_args()
     
     torch.manual_seed(args.seed)
-
-
     # Setup
     device, dtype = setup_device_and_dtype(args)
     dataset = create_dataset(args, device, dtype)

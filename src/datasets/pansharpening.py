@@ -62,9 +62,9 @@ class PANDataset(data.Dataset):
         self.spectral_resolution = self.file.attrs['spectral_resolution (nm)']
 
         # Dimensions des données
-        self.nband = self.file[self.split][0][:].shape[2]
-        self.height = size if size else self.file[self.split][0][:].shape[0]
-        self.width = size if size else self.file[self.split][0][:].shape[1]
+        self.nband = self.file[self.split][str(0)][:].shape[2]
+        self.height = size if size else self.file[self.split][str(0)][:].shape[0]
+        self.width = size if size else self.file[self.split][str(0)][:].shape[1]
         
         self._init_operators()
 
@@ -111,7 +111,7 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Image hyperspectrale [C, H, W]
         """
-        img = torch.from_numpy(self.file[self.split][idx][:]).float()
+        img = torch.from_numpy(self.file[self.split][str(idx)][:]).float()
         img = img.permute(2, 0, 1)  # (H,W,C) -> (C,H,W)
         
         if self.normalize:
@@ -120,7 +120,7 @@ class PANDataset(data.Dataset):
         if self.transform:
             img = self.transform(img)
                 
-        return img
+        return img.to(self.device)
     
 
     def get_operators(self):
