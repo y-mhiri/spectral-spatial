@@ -1,0 +1,13 @@
+name: PANGradAlign
+description: 
+path: experiments/
+executable: experiments/experiment_ctv_grad_alig.py
+executable_command: python
+datasets:
+  - harvard
+actions:
+  - summary:
+      name: summary
+      executable: actions/quick_summary.py
+      executable_command: python
+      description: Quick summary of run results

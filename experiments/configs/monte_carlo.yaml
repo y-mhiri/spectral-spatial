@@ -1,0 +1,34 @@
+name: monte_carlo
+description: Monte carlo experiment to get metrics.
+path: experiments/
+executable: experiments/experiment_monte_carlo.py
+executable_command: python
+datasets:
+  - harvard
+actions:
+  - summary:
+      name: summary
+      executable: actions/quick_summary.py
+      executable_command: python
+      description: Quick summary of run results
+  - visualize_loss:
+      name: visualize_loss
+      executable: actions/analyze_convergence.py
+      executable_command: python
+      description: Show loss vs iteration.
+  - visualize_metrics:
+      name: visualize_metrics
+      executable: actions/analyze_metrics.py
+      executable_command: python
+      description: Show metrics.
+  - visualize_custom:
+      name: visualize_custom
+      executable: actions/visualize_custom.py
+      executable_command: python
+      description: Show reconstructed images.
+  - noise_plot:
+      name: noise_plot
+      executable: actions/noise_plot.py
+      executable_command: python
+      description: Show reconstructed images.
+    
