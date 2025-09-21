@@ -63,7 +63,9 @@ def main():
     # Setup
     device, dtype = setup_device_and_dtype(args)
     dataset = create_dataset(args, device, dtype)
-    subset = torch.utils.data.Subset(dataset, args.image_idx)
+    image_idx = [int(idx) for idx in args.image_idx.split(' ')]
+    subset = torch.utils.data.Subset(dataset, image_idx)
+    
     A, A_adj, R, R_adj = dataset.get_operators()
     
     print_experiment_info(args, args.algorithm)
@@ -125,7 +127,7 @@ def main():
                                         p=args.p, q=args.q, r=args.r, verbose=True, params=chambolle_params)
             
             # Run optimization
-            reconstructed, loss, compute_time = run_optimization(optim, Y_H, Y_M)
+            reconstructed, loss, relval, compute_time = run_optimization(optim, Y_H, Y_M)
             total_time += compute_time
         
             # Store results
