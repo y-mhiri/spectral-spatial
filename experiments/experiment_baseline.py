@@ -143,7 +143,7 @@ def main():
         torch.cuda.empty_cache()
     
     # Save results
-    store_results(root, args, reconstructed_ar, loss_ar, relval_arr, metrics, total_time, args.algorithm)
+    store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, total_time, args.algorithm)
     save_experiment_info(args.storage_path, args, total_time, metrics, args.algorithm)
     
     print(f"Experiment completed in {total_time:.2f}s")
