@@ -205,8 +205,8 @@ class PANDataset(data.Dataset):
         RU_t = RU_t.view(1,self.nband, self.height,self.width)
         return RU_t
 
-    def noise(self,imput_image):
+    def noise(self,input_image):
         noise_model = GaussianNoise(self.sigma1)
-        physics = Denoising(device=imput_image.device, noise_model=noise_model)
-        observation = physics(imput_image)
+        physics = Denoising(device=input_image.device, noise_model=noise_model)
+        observation = physics(input_image)
         return observation
