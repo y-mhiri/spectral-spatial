@@ -134,7 +134,7 @@ def main():
             # Store results
             reconstructed_ar[m,j] = reconstructed
             loss_ar[m,j] = loss
-            relvar_ar[m,j] = relval
+            relval_ar[m,j] = relval
         
             # Compute metrics
             sample_metrics = compute_metrics(gt=X, est=reconstructed, numpy=True)
