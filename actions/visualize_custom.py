@@ -13,6 +13,33 @@ setup_paths()
 from experiment_helpers import create_dataset, setup_device_and_dtype
 
 
+def add_sub_figure(path, width):
+
+    content = f"\\begin{{subfigure}}[b]{{{width:0.02f}}}\n"
+
+    content += f"\includegraphics[width=\textwidth]{{{path}}}\n"
+    content += "\end{subfigure}\n"
+
+    return content
+
+def generate_figure(path_to_pngs, nfigs_per_row=3, caption=None):
+
+    nfig = len(arrays)
+    
+    content = ""
+    content += "\\begin{figure}\n"
+
+    for path in path_to_pngs:
+        content += add_subfigure(path, width=1/nfigs_per_row)
+    
+    if caption is not None:
+        content += caption
+
+    content += "\end{figure}\n"
+
+    return content
+
+
 def get_rgb_indices(dataset_path):
     """Get RGB band indices for dataset"""
     rgb_indices_map = {
@@ -37,10 +64,9 @@ def load_all_image_data(metadata):
     device, dtype = setup_device_and_dtype(args)
     dataset = create_dataset(args, device, dtype)
     
-    image_idx = getattr(args, 'image_idx', [0])
-    if not isinstance(image_idx, list):
-        image_idx = [image_idx]
+    image_idx = getattr(args, 'image_idx', "6")
     
+    image_idx = [int(idx) for idx in image_idx.split(' ')]
     subset = torch.utils.data.Subset(dataset, image_idx)
     
     # Load reconstructed arrays from zarr
@@ -205,6 +231,21 @@ def main():
     # Process each group
     for metadata in successful:
         visualize_group(metadata, output_dir)
+
+#     # Generate tex file
+
+#     texfile_name = os.path.join(output_dir, 'figure.tex')
+
+#     with open(texfile_name, 'w') as f:
+
+#         # per image
+#         # gt, noisy, pan, l111 x2, l221 x2, linf11 x2
+        
+
+#         f.write(generate_figure(path_to_pngs))
+    
+# # 
+
     
     print(f"\nVisualization complete!")
     print(f"Results saved to: {output_dir}")
