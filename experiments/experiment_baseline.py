@@ -103,7 +103,7 @@ def main():
         # Prepare data
         X = data.unsqueeze(0).to(device=device, dtype=dtype)
         Y_H = dataset.simulate_low_res_hsi(data.unsqueeze(0)).to(device=device, dtype=dtype)
-        Y_M = dataset.get_panchromatic(data.unsqueeze(0)).to(device=device, dtype=dtype, noise=clean_pan)
+        Y_M = dataset.get_panchromatic(data.unsqueeze(0), noise=clean_pan).to(device=device, dtype=dtype)
         
         # Setup optimizer
         if args.algorithm == 'PANTVCB':
