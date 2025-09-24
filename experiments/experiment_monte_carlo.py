@@ -37,6 +37,7 @@ def main():
     parser.add_argument("--noise_level", type=float, required=True)
     parser.add_argument("--sigma", type=float, required=True)
     parser.add_argument("--scale", type=int, required=True)
+    parser.add_argument("--pan", type=str, default='noisy')
     
     # Algorithm parameters
     parser.add_argument("--max_iter", type=int, default=50)
@@ -67,6 +68,7 @@ def main():
     subset = torch.utils.data.Subset(dataset, image_idx)
     
     A, A_adj, R, R_adj = dataset.get_operators()
+    clean_pan = False if args.pan == 'clean' else True
     
     print_experiment_info(args, args.algorithm)
     
@@ -105,7 +107,7 @@ def main():
 
             # Prepare data
             Y_H = dataset.simulate_low_res_hsi(data.unsqueeze(0)).to(device=device, dtype=dtype)
-            Y_M = dataset.get_panchromatic(data.unsqueeze(0)).to(device=device, dtype=dtype)
+            Y_M = dataset.get_panchromatic(data.unsqueeze(0), noise=clean_pan).to(device=device, dtype=dtype)
             
             # Setup optimizer
             if args.algorithm == 'PANTVCB':
