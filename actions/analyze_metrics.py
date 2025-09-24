@@ -137,10 +137,11 @@ def fetch_group_results(group_path):
 
         metadata = root.attrs
 
-        nimages = len(metadata['image_idx'])
+        nimages = len(metadata['image_idx']) if isinstance(metadata["image_idx"], list) else 1
         dfs = []
+        # print(f'{nimages} image results found.')
+        # print(metadata['image_idx'])
         for im in range(nimages):
-
             p = str(int(metadata['p'])) if metadata['p'] != float('inf') else '\infty'
             q = str(int(metadata['q'])) if metadata['q'] != float('inf') else '\infty'
             r = str(int(metadata['r'])) if metadata['r'] != float('inf') else '\infty'
@@ -152,7 +153,6 @@ def fetch_group_results(group_path):
                         'SAM' : f"{metadata['SAM'][im]:.2f}",
                         'PSNR' : f"{metadata['PSNR'][im]:.2f}"
                         }
-
 
             dfs.append(pd.DataFrame(d, index=[0]))
         return dfs
@@ -166,18 +166,15 @@ def analyze_results(storage_path, output_folder):
 
     groups = glob.glob(os.path.join(storage_path,'group_*'))
 
-    first_group = 0
-    while not os.path.isfile(os.path.join(groups[first_group], 'info.yaml')):
-        first_group += 1
-    df_metrics = fetch_group_results(groups[first_group+1])
+    df_metrics = fetch_group_results(groups[0])
 
-    for group_path in groups:
+    for group_path in groups[1::]:
 
         if os.path.isfile(os.path.join(group_path, 'info.yaml')):
             dfs = fetch_group_results(group_path)
             for i, df in enumerate(dfs):
                 df_metrics[i] = pd.concat([df_metrics[i], df], ignore_index=True)
-
+    print(df_metrics)
     for i,df in enumerate(df_metrics):
         create_tabular(df, output_folder, f'metrics_table_{i}.tex')
 
