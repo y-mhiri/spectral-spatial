@@ -24,9 +24,9 @@ def generate_loss_plot(loss_data, filename, labels=None):
         label = labels[i] if labels is not None else f'graph_{i}'
         plt.plot(loss, label=label)
     
-    plt.xlabel('Itérations')
-    plt.ylabel('Fonction de coût (échelle log)')
-    plt.title('Évolution de la fonction de coût')
+    plt.xlabel('Number of iterations')
+    plt.ylabel('Objective function (in log scale)')
+    # plt.title('')
     plt.yscale('log')
     plt.legend()
     plt.grid(True)
@@ -47,6 +47,8 @@ def fetch_group_results(group_path):
         losses = root['loss']
         metadata = root.attrs
 
+
+        niter = metadata['max_iter_cp']
         nimages = len(metadata['image_idx'])
         
         p = str(int(metadata['p'])) if metadata['p'] != float('inf') else 'inf'
@@ -54,7 +56,7 @@ def fetch_group_results(group_path):
         r = str(int(metadata['r'])) if metadata['r'] != float('inf') else 'inf'
         plot_name = f"{group_num}_{metadata['algorithm']}_l{p}{q}{r}.png"
             
-        return losses, plot_name
+        return losses, plot_name, niter 
 
         
     except Exception as e:
@@ -68,24 +70,25 @@ def analyze_results(storage_path, output_folder, one_plot):
     groups = glob.glob(os.path.join(storage_path,'group_*'))
 
     loss_list = []
+    niter_list = []
 
 
             
-    losses, plot_name = fetch_group_results(groups[0])
+    losses, plot_name, niter = fetch_group_results(groups[0])
     n_images_prev = losses.shape[0]
     for group_path in groups:
 
         
         if os.path.isfile(os.path.join(group_path, 'info.yaml')):
             
-            losses, plot_name = fetch_group_results(group_path)
+            losses, plot_name, niter = fetch_group_results(group_path)
             generate_loss_plot(losses,  os.path.join(output_folder, plot_name))
             n_images_curr = losses.shape[0]
             if one_plot : 
                 assert n_images_curr == n_images_prev
                 n_images_prev = n_images_curr
 
-
+            niter_list.append(niter)
             loss_list.append(losses)
 
     n_images = n_images_curr
@@ -93,7 +96,8 @@ def analyze_results(storage_path, output_folder, one_plot):
         loss_array = np.array(loss_list).reshape(n_images, len(loss_list), -1)        
 
         for im in range(n_images):
-            generate_loss_plot(loss_array[im], os.path.join(output_folder, f'loss_per_group_image_{im}.png'))
+            labels = [f'{i} sub-iteration' if i==1 else f'{i} sub-iterations' for i in niter_list]
+            generate_loss_plot(loss_array[im], os.path.join(output_folder, f'loss_per_group_image_{im}.png'), labels=labels)
 
     return True
 
