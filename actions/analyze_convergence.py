@@ -14,10 +14,8 @@ plt.rc('font', family='serif')
 
 
 
-def generate_loss_plot(loss_data, folder):
+def generate_loss_plot(loss_data, filename):
     """Génère la courbe de convergence"""
-    if loss_data is None or len(loss_data) == 0:
-        return
 
     plt.figure(figsize=(8, 5))
     
@@ -33,7 +31,7 @@ def generate_loss_plot(loss_data, folder):
     plt.grid(True)
     
     # Sauvegarde
-    plt.savefig(os.path.join(folder, 'cost_function.png'), bbox_inches='tight', dpi=300)
+    plt.savefig(filename , bbox_inches='tight', dpi=300)
     plt.close()
     print("[green]Graphique de convergence généré")
 
@@ -44,10 +42,10 @@ def fetch_group_results(group_path):
     """Analyse principale des résultats"""
     try:
         zarr_path = os.path.join(group_path, 'results.zarr')
+        group_num = group_path.split('group_')[-1]
         root = zarr.open(zarr_path, mode='r')
         
         losses = root['loss']
-        recons
         metadata = root.attrs
 
         nimages = len(metadata['image_idx'])
@@ -55,7 +53,7 @@ def fetch_group_results(group_path):
         p = str(int(metadata['p'])) if metadata['p'] != float('inf') else 'inf'
         q = str(int(metadata['q'])) if metadata['q'] != float('inf') else 'inf'
         r = str(int(metadata['r'])) if metadata['r'] != float('inf') else 'inf'
-        plot_name = f"{metadata['noise_level']}_{metadata["algorithm"]}_l{p}{q}{r}"
+        plot_name = f"{group_num}_{metadata['algorithm']}_l{p}{q}{r}.png"
             
         return losses, plot_name
 
@@ -64,7 +62,6 @@ def fetch_group_results(group_path):
         print(f"[red]Erreur d'analyse : {str(e)}[/red]")
         return False
 
-def get_convergence(losses):
     
 
 
@@ -77,20 +74,17 @@ def analyze_results(storage_path, output_folder):
         first_group += 1
 
     losses, plot_name = fetch_group_results(groups[first_group+1])
-    df = get_convergence(losses)
-
-    plot_loss(losses, niter, plot_name)
+    generate_loss_plot(losses, os.path.join(output_folder,plot_name))
     for group_path in groups:
 
         if os.path.isfile(os.path.join(group_path, 'info.yaml')):
             losses, plot_name = fetch_group_results(group_path)
 
-            niter = get_convergence(losses)
-            plot_loss(losses, niter, plot_name)
+            generate_loss_plot(losses,  os.path.join(output_folder, plot_name))
             
 
 
-    create_tabular(df, output_folder, f'convergence.tex')
+    # create_tabular(df, output_folder, f'convergence.tex')
 
     return True
 
