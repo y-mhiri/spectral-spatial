@@ -14,14 +14,15 @@ plt.rc('font', family='serif')
 
 
 
-def generate_loss_plot(loss_data, filename):
-    """Génère la courbe de convergence"""
+def generate_loss_plot(loss_data, filename, labels=None):
+
 
     plt.figure(figsize=(8, 5))
     
     # Tracé pour chaque image
     for i, loss in enumerate(loss_data):
-        plt.plot(loss, label=f'Image {i}')
+        label = labels[i] if labels is not None else f'graph_{i}'
+        plt.plot(loss, label=label)
     
     plt.xlabel('Itérations')
     plt.ylabel('Fonction de coût (échelle log)')
@@ -33,13 +34,11 @@ def generate_loss_plot(loss_data, filename):
     # Sauvegarde
     plt.savefig(filename , bbox_inches='tight', dpi=300)
     plt.close()
-    print("[green]Graphique de convergence généré")
 
 
 
 def fetch_group_results(group_path):
-    # zarr_path, output_folder):
-    """Analyse principale des résultats"""
+
     try:
         zarr_path = os.path.join(group_path, 'results.zarr')
         group_num = group_path.split('group_')[-1]
@@ -64,27 +63,37 @@ def fetch_group_results(group_path):
 
     
 
-
-def analyze_results(storage_path, output_folder):
+def analyze_results(storage_path, output_folder, one_plot):
 
     groups = glob.glob(os.path.join(storage_path,'group_*'))
 
-    first_group = 0
-    while not os.path.isfile(os.path.join(groups[first_group], 'info.yaml')):
-        first_group += 1
+    loss_list = []
 
-    losses, plot_name = fetch_group_results(groups[first_group+1])
-    generate_loss_plot(losses, os.path.join(output_folder,plot_name))
+
+            
+    losses, plot_name = fetch_group_results(groups[0])
+    n_images_prev = losses.shape[0]
     for group_path in groups:
 
+        
         if os.path.isfile(os.path.join(group_path, 'info.yaml')):
-            losses, plot_name = fetch_group_results(group_path)
-
-            generate_loss_plot(losses,  os.path.join(output_folder, plot_name))
             
+            losses, plot_name = fetch_group_results(group_path)
+            generate_loss_plot(losses,  os.path.join(output_folder, plot_name))
+            n_images_curr = losses.shape[0]
+            if one_plot : 
+                assert n_images_curr == n_images_prev
+                n_images_prev = n_images_curr
 
 
-    # create_tabular(df, output_folder, f'convergence.tex')
+            loss_list.append(losses)
+
+    n_images = n_images_curr
+    if one_plot:
+        loss_array = np.array(loss_list).reshape(n_images, len(loss_list), -1)        
+
+        for im in range(n_images):
+            generate_loss_plot(loss_array[im], os.path.join(output_folder, f'loss_per_group_image_{im}.png'))
 
     return True
 
@@ -114,17 +123,15 @@ def create_tabular(df, output_folder, filename):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--storage_path', required=True, help='Chemin vers les résultats')
+    parser.add_argument('--storage_path', required=True, help='Storage path (automatically filled y quanat).')
+    parser.add_argument('--one_plot', action='store_true', help='Creates only one plot when True')
     parser.add_argument('--out', type=str, help='Output folder name (stored in run folder).', default="metrics")
     args = parser.parse_args()
-    # Détermination des chemins
+
     output_folder = os.path.join(args.storage_path, args.out)
 
     os.makedirs(output_folder, exist_ok=True)
 
     print(f"[bold]Analyse des résultats : {args.storage_path}")
     
-    if analyze_results(args.storage_path, output_folder):
-        print("[bold green]Analyse terminée avec succès!")
-    else:
-        print("[bold red]Échec de l'analyse")
+    analyze_results(args.storage_path, output_folder, args.one_plot)

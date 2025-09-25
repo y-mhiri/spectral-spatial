@@ -101,7 +101,7 @@ class TVGradAlignment(ChambollePock):
 
     def compute_L(self, nband=None):
         """
-        Retourne une borne sûre de ||K|| avec K = W * nabla.
+        Retourne une borne sur ||K|| avec K = W * nabla.
 
         On utilise: ||K|| <= (max_x ||W(x)||_2) * ||nabla||, 
         et ||nabla|| ~= sqrt(8) pour un gradient 2D (forward diffs).

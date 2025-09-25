@@ -23,7 +23,6 @@ class PANTVGradAlignment(PANProximalGradient):
         params['alpha'] = self.alpha
 
         self.optim = TVGradAlignment(**params)
-        # Assurez-vous que W est initialisé
         self.W = self.optim.W
 
 
