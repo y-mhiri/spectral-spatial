@@ -7,14 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import pandas as pd
-from rich import print
 
 sns.set_style('darkgrid')
 plt.rc('font', family='serif')
 
 
 
-def generate_loss_plot(loss_data, filename, labels=None):
+def generate_loss_plot(loss_data, filename, max_iter=None, labels=None):
 
 
     plt.figure(figsize=(8, 5))
@@ -22,17 +21,25 @@ def generate_loss_plot(loss_data, filename, labels=None):
     # Tracé pour chaque image
     for i, loss in enumerate(loss_data):
         label = labels[i] if labels is not None else f'graph_{i}'
-        plt.plot(loss, label=label)
+        if max_iter is None:
+            plt.plot(loss, label=label)
+        else:
+            plt.plot(loss[0:max_iter], label=label)
     
     plt.xlabel('Number of iterations')
     plt.ylabel('Objective function (in log scale)')
-    # plt.title('')
+    plt.title('')
     plt.yscale('log')
+    plt.ylim(100,400)
     plt.legend()
     plt.grid(True)
     
     # Sauvegarde
-    plt.savefig(filename , bbox_inches='tight', dpi=300)
+    if max_iter:
+        filename, _ = filename.split('.png')
+        plt.savefig(os.path.join(f'{filename}_{max_iter}.png') , bbox_inches='tight', dpi=300)
+    else:
+        plt.savefig(filename , bbox_inches='tight', dpi=300)
     plt.close()
 
 
@@ -65,7 +72,7 @@ def fetch_group_results(group_path):
 
     
 
-def analyze_results(storage_path, output_folder, one_plot):
+def analyze_results(storage_path, output_folder, one_plot, max_iter):
 
     groups = glob.glob(os.path.join(storage_path,'group_*'))
 
@@ -83,6 +90,8 @@ def analyze_results(storage_path, output_folder, one_plot):
             
             losses, plot_name, niter = fetch_group_results(group_path)
             generate_loss_plot(losses,  os.path.join(output_folder, plot_name))
+            if max_iter:
+                generate_loss_plot(losses,  os.path.join(output_folder, plot_name), max_iter)
             n_images_curr = losses.shape[0]
             if one_plot : 
                 assert n_images_curr == n_images_prev
@@ -98,6 +107,9 @@ def analyze_results(storage_path, output_folder, one_plot):
         for im in range(n_images):
             labels = [f'{i} sub-iteration' if i==1 else f'{i} sub-iterations' for i in niter_list]
             generate_loss_plot(loss_array[im], os.path.join(output_folder, f'loss_per_group_image_{im}.png'), labels=labels)
+            
+            if max_iter:   
+                generate_loss_plot(loss_array[im], os.path.join(output_folder, f'loss_per_group_image_{im}.png'),max_iter=max_iter, labels=labels)
 
     return True
 
@@ -129,6 +141,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--storage_path', required=True, help='Storage path (automatically filled y quanat).')
     parser.add_argument('--one_plot', action='store_true', help='Creates only one plot when True')
+    parser.add_argument('--max_iter', type=int, default=None, help='If specified, defines the number of iterations to plot')
     parser.add_argument('--out', type=str, help='Output folder name (stored in run folder).', default="metrics")
     args = parser.parse_args()
 
@@ -136,6 +149,6 @@ if __name__ == "__main__":
 
     os.makedirs(output_folder, exist_ok=True)
 
-    print(f"[bold]Analyse des résultats : {args.storage_path}")
+    print(f"Analyse des résultats : {args.storage_path}")
     
-    analyze_results(args.storage_path, output_folder, args.one_plot)
+    analyze_results(args.storage_path, output_folder, args.one_plot, args.max_iter)
