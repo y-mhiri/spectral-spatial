@@ -54,7 +54,7 @@ def main():
     
     # PANTVGradAlign specific
     parser.add_argument("--threshold_type", type=str, default="soft", choices=["hard", "soft"])
-    parser.add_argument("--threshold_param", type=float, default=1e-7)
+    parser.add_argument("--threshold_param", type=float, default=0.5)
     
     args = parser.parse_args()
     
