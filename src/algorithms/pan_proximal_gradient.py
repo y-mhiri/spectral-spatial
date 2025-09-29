@@ -50,9 +50,6 @@ class PANProximalGradient(nn.Module):
         ch.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(ch)
 
-    
-
-
 
     def ctv_norm(self, U, eps=1e-8):
         """
@@ -86,18 +83,6 @@ class PANProximalGradient(nn.Module):
         # ---- Retour : somme totale par image ----
         #   Dans l'article, CTV = somme sur tous les pixels des normes locales
         return norm_r
-
-        
-    
-    
-    
-    def ctv_norm1(self,U, p, q, r):
-        """Calcule la norme CTV l^p,q,r d'un tenseur A (shape: b x c x hx w x 2 )."""
-        # Ordre: p sur canaux (axis=1), q sur dérivées (axis=-1), r sur pixels (axis=(2,3))
-        norm_p = torch.sum(torch.abs(U)**p, dim=1, keepdim=True)**(1/p)
-        norm_q = torch.sum(norm_p**q, dim=-1, keepdim=True)**(1/q)
-        norm_r = torch.sum(norm_q**r, dim=(2,3), keepdim=True)**(1/r)
-        return norm_r
         
 
     def convergence_criteria(self, U0, U1):
@@ -116,30 +101,10 @@ class PANProximalGradient(nn.Module):
     def compute_cost(self, U, Y_H, Y_M):
         """
         Calcule le coût total de la fonction objective.
-        
-        Args:
-            U (torch.Tensor): Image estimée [b,c,h,w]
-            Y_H (torch.Tensor): Données hyperspectrales [b,c,h//scale,w//scale]
-            Y_M (torch.Tensor): Données panchromatiques [b,1,h,w]
-            
-        Returns:
-            float: Coût total
-        """
-        # Terme d'attache aux données hyperspectrales
-        data_term_h = 0.5 * torch.norm(self.A(U)-Y_H)**2
-        
-        # Terme d'attache aux données panchromatiques
-        
-        data_term_m = 0.5 * self.lmbda_m * torch.norm(self.spectral_op(U)-Y_M)**2
-        
-        # Terme de régularisation TV
-        grad_U = nabla(U)
-        #tv_per_pixel = torch.sqrt(torch.sum(grad_U**2, dim=(1,4)))
-        #torch.sum(tv_per_pixel)
-        tv_term = self.lmbda * self.ctv_norm(grad_U,eps=1e-8)
-        
-        return data_term_h + data_term_m + tv_term ,data_term_h,data_term_m,tv_term
+        """ 
 
+        raise NotImplementedError('compute_cost is not implemented in abstract class.')       
+       
     def grad_f(self, U, Y_H, Y_M):
         """
         Calcule le gradient de la fonction objective.
@@ -164,19 +129,19 @@ class PANProximalGradient(nn.Module):
     
     def proxg(self, x):
         """Opérateur proximal (à implémenter)."""
-        raise NotImplementedError("L'opérateur proximal doit être implémenté")
+        raise NotImplementedError("prox() is not implemented in abstract class.")
     
 
         
     def forward(self, Y_H, Y_M):
         """
-        ISTA simple : U_{k+1} = prox_g(U_k - alpha * grad_f(U_k))
+        Proximal gradient : U_{k+1} = prox_g(U_k - alpha * grad_f(U_k))
         """
         # ---- Calcul de L et alpha ----
         c = Y_H.shape[1]   # nombre de bandes
         L = 1.0 + self.lmbda_m * (1.0 / c)
         self.alpha = 1.0 / L
-        self.logger.info(f"[ISTA] L = {L:.6f}  |  alpha = {self.alpha:.6f}")
+        self.logger.info(f"[Proximal Gradient] L = {L:.6f}  |  alpha = {self.alpha:.6f}")
 
         # ---- Initialisation ----
         U = self.Aadj(Y_H).clone()

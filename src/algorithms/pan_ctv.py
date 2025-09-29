@@ -1,78 +1,70 @@
-from pan_gradient_prox import PANProximalGradient 
-from nabla import nabla,nabla_adjoint
 import torch
+from nabla import nabla, nabla_adjoint
+from algorithms.pan_proximal_gradient import PANProximalGradient
+from algorithms.prox_tv_prior import TVPrior
 
-
-
-
-class PANTVCTV(PANProximalGradient):
+class PANTVCB(PANProximalGradient):
     """
-    Calcul de l'opérateur proximal de la TV vectorielle par descente de gradient projeté.
-    
+    Calcul de l'opérateur proximale de la TV vectorielle en utilisant chamboll pock.
     Attributs:
-        max_iter_gp (int): Nombre maximal d'itérations pour la descente de gradient
-        tau (float): Pas de descente
-    """
+        solver (class): résoud l'algo de chamboll pock avec les paramétre nécessaire.
 
-    def __init__(self, A, Aadj,spectral_op,spectral_op_t, max_iter, lmbda, lmbda_m, tol, scale,p ,q ,r,verbose):
+    Methods:
+    proxg(input_image)
+       cette fonction donne l'opérateur proximale de l'image d'entrée en faisant un algo de chamboll pock
+
+    """
+    def __init__(self, params, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        params['p'] = self.p
+        params['q'] = self.q
+        params['r'] = self.r
+
+        self.optim = TVPrior(**params)
+
+
+    def proxg(self,x):
         """
-        Initialise les paramètres de l'algorithme.
+        Donne l'opérateur proximale de la tv vectorielle avec chamboll pock ....
+        
+        """
+        params = {}
+
+        params['compute_L'] = {'nband': 31}
+        params['K'] = {}
+        params['K_adjoint'] = {}
+        params['prox_sigma_g_conj'] = {}
+        params['prox_tau_f'] = {'y': x, 'sigma2': 1}
+        params['loss_fn'] = {}
+
+
+        return self.optim(x,init=None, verbose=False, params=params, return_loss=False)
+    
+
+    def compute_cost(self, U, Y_H, Y_M):
+        """
+        Calcule le coût total de la fonction objective.
         
         Args:
-            max_iter_gp (int): Nombre max d'itérations pour la sous-optimisation
-            tau (float): Pas de descente pour le gradient projeté
+            U (torch.Tensor): Image estimée [b,c,h,w]
+            Y_H (torch.Tensor): Données hyperspectrales [b,c,h//scale,w//scale]
+            Y_M (torch.Tensor): Données panchromatiques [b,1,h,w]
+            
+        Returns:
+            float: Coût total
         """
-        super().__init__(A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda, lmbda_m, tol, scale,p,q,r,verbose)
-        self.p = p 
-        self.q = q
-        self.r = r
+        # Terme d'attache aux données hyperspectrales
+        data_term_h = 0.5 * torch.norm(self.A(U)-Y_H)**2
         
-    
-    def project_dual_ball_r(self, U, p_star, q_star, r_star, eps=1e-8):
-        """
-        Projection sur la boule duale l^{p*,q*,r*} <= 1.
-        Gère explicitement p*, q*, r* = infinity.
-        """
-        # Étape 1: Norme p* sur les canaux (axis=1)
-        if torch.isinf(torch.tensor(p_star, device=U.device)):
-            norm_p_star= torch.amax(torch.abs(U), dim=1, keepdim=True) # l^infini
-        else:
-            norm_p_star = torch.sum(torch.abs(U)**p_star, dim=1, keepdim=True)**(1/(p_star + eps))
-
-        # Étape 2: Norme q* sur les dérivées (axis=-1)
-        if torch.isinf(torch.tensor(q_star, device=U.device)):
-            norm_q_star= torch.amax(torch.abs(norm_p_star), dim=-1, keepdim=True)   # l^infini
-        else:
-            norm_q_star = torch.sum(norm_p_star**q_star, dim=-1, keepdim=True)**(1/(q_star + eps))
-
-        # Étape 3: Norme r* sur les pixels (axis=(2,3))
-        if torch.isinf(torch.tensor(r_star, device=U.device)):
-            norm_r_star= torch.amax(torch.abs(norm_q_star), dim=(2,3), keepdim=True)  # l^infini
-        else:
-            norm_r_star = torch.sum(norm_q_star**r_star, dim=(2,3), keepdim=True)**(1/(r_star + eps))
-
-        # Scaling pour respecter ||U||_{p*,q*,r*} <= 1
-        scaling = torch.maximum(torch.tensor(1.0, device=U.device), norm_r_star)
-        return U / (scaling + eps)
-
-
-    def proxg(self, x):
-        """Opérateur proximal pour la norme CTV l^p,q,r avec gestion de p,q,r=infini."""
-        # Calcul des exposants duaux (gère p,q,r=1 et p,q,r=infini)
-        def get_dual_exponent(val):
-            if val == 1:
-                return torch.inf
-            elif torch.isinf(torch.tensor(val)):
-                return 1.0
-            else:
-                return 1 / (1 - 1/val)
-
-        p_star = get_dual_exponent(self.p)
-        q_star = get_dual_exponent(self.q)
-        r_star = get_dual_exponent(self.r)
-
-        # Projection duale + formule de Moreau
-        grad = nabla(x)
-        x_tilde = grad / self.lmbda
-        proj = self.project_dual_ball_r(x_tilde, p_star, q_star, r_star)
-        return x - self.lmbda * nabla_adjoint(proj)
+        # Terme d'attache aux données panchromatiques
+        
+        data_term_m = 0.5 * self.lmbda_m * torch.norm(self.spectral_op(U)-Y_M)**2
+        
+        # Terme de régularisation TV
+        grad_U = nabla(U)
+        #tv_per_pixel = torch.sqrt(torch.sum(grad_U**2, dim=(1,4)))
+        #torch.sum(tv_per_pixel)
+        tv_term = self.lmbda * self.ctv_norm(grad_U,eps=1e-8)
+        
+        return data_term_h + data_term_m + tv_term ,data_term_h,data_term_m,tv_term 
