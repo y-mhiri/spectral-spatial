@@ -28,7 +28,8 @@ def create_dataset(args, device, dtype):
     
     # Normalize sigma by crop size for consistency
     sigma_norm = args.sigma / (args.crop_size * args.crop_size) if args.crop_center else args.sigma
-    noise_norm = args.noise_level / (args.crop_size * args.crop_size) if args.crop_center else args.noise_level
+    # noise_norm = args.noise_level / (args.crop_size * args.crop_size) if args.crop_center else args.noise_level
+    noise_norm = 10**(-args.noise_level/10)/args.crop_size
     
     from pansharpening import PANDataset
     return PANDataset(

@@ -176,13 +176,12 @@ class ChambollePock(nn.Module):
 
 
             if verbose:
-                print('Iteration: ', it, 'relative variation: ', torch.norm(u - u_old)/torch.norm(u_old))
+                print('[Chambolle-Pock] Iteration: ', it, 'relative variation: ', torch.norm(u - u_old)/torch.norm(u_old))
 
-                print('Cost function: ', loss[it])
+                print('[Chambolle-Pock] Cost function: ', loss[it])
 
             
-            if rel[it] < self.tol and verbose:
-                print('Iteration: ', it, 'relative variation: ', torch.norm(u - u_old)/torch.norm(u_old))
+            if rel[it] < self.tol:
                 print(f'Converged after {it+1} iterations.')
                 break
 
