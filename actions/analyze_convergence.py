@@ -22,7 +22,7 @@ def generate_loss_plot(loss_data, filename, max_iter=None, labels=None):
     for i, loss in enumerate(loss_data):
         label = labels[i] if labels is not None else f'graph_{i}'
         if max_iter is None:
-            plt.plot(loss, label=label, marker=next(markers))
+            plt.plot(loss, label=label, marker=next(markers, 'o'))
         else:
             plt.plot(loss[0:max_iter], label=label,marker=next(markers))
     
@@ -53,17 +53,7 @@ def fetch_group_results(group_path):
         
         losses = root['loss']
         metadata = root.attrs
-
-
-        niter = metadata['max_iter_cp']
-        nimages = len(metadata['image_idx'])
-        
-        p = str(int(metadata['p'])) if metadata['p'] != float('inf') else 'inf'
-        q = str(int(metadata['q'])) if metadata['q'] != float('inf') else 'inf'
-        r = str(int(metadata['r'])) if metadata['r'] != float('inf') else 'inf'
-        plot_name = f"{group_num}_{metadata['algorithm']}_l{p}{q}{r}.png"
-            
-        return losses, plot_name, niter 
+        return losses, metadata
 
         
     except Exception as e:
@@ -72,44 +62,45 @@ def fetch_group_results(group_path):
 
     
 
-def analyze_results(storage_path, output_folder, one_plot, max_iter):
+def analyze_results(storage_path, output_folder, min_iter, max_iter):
 
     groups = glob.glob(os.path.join(storage_path,'group_*'))
 
-    loss_list = []
-    niter_list = []
+    losses_dicts = []
+    max_iter_cp_val = []
+    lmbda_val = []
 
+    for group_path in groups:    
 
-            
-    losses, plot_name, niter = fetch_group_results(groups[0])
-    n_images_prev = losses.shape[0]
-    for group_path in groups:
-
-        
         if os.path.isfile(os.path.join(group_path, 'info.yaml')):
             
-            losses, plot_name, niter = fetch_group_results(group_path)
-            generate_loss_plot(losses,  os.path.join(output_folder, plot_name))
-            if max_iter:
-                generate_loss_plot(losses,  os.path.join(output_folder, plot_name), max_iter)
-            n_images_curr = losses.shape[0]
-            if one_plot : 
-                assert n_images_curr == n_images_prev
-                n_images_prev = n_images_curr
+            losses, metadata = fetch_group_results(group_path)
+            if metadata['max_iter_cp'] not in max_iter_cp_val:
+                max_iter_cp_val.append(metadata['max_iter_cp'])
 
-            niter_list.append(niter)
-            loss_list.append(losses)
+            if metadata['lmbda'] not in lmbda_val:
+                lmbda_val.append(metadata['lmbda'])
 
-    n_images = n_images_curr
-    if one_plot:
-        loss_array = np.array(loss_list).reshape(n_images, len(loss_list), -1)        
+            losses_dicts.append({'max_iter_cp': metadata['max_iter_cp'], 
+                                 'lmbda' : metadata['lmbda'], 
+                                 'losses': losses[0,min_iter:max_iter] if max_iter else losses[0,min_iter:]})
+        else:
+            print(f'No finished run found at {group_path}.')            
+    
+    for val in max_iter_cp_val:
+        filtered_dicts = [d for d in losses_dicts if d['max_iter_cp'] == val]
+        array = np.array([np.reshape(d['losses'],(d['losses'].shape[-1], -1)) for d in filtered_dicts])
+        labels = [f'$\lambda = {d["lmbda"]}$' for d in filtered_dicts]
+        generate_loss_plot(array, os.path.join(output_folder, f'max_iter_cp_{val}.png'), labels=labels)
 
-        for im in range(n_images):
-            labels = [f'{i} sub-iteration' if i==1 else f'{i} sub-iterations' for i in niter_list]
-            generate_loss_plot(loss_array[im], os.path.join(output_folder, f'loss_per_group_image_{im}.png'), labels=labels)
+    for val in lmbda_val:
+        filtered_dicts = [d for d in losses_dicts if d['lmbda'] == val]
+        array = np.array([np.reshape(d['losses'],(d['losses'].shape[-1], -1)) for d in filtered_dicts])
+        labels = [f'{d["max_iter_cp"]} sub-iteration' if d["max_iter_cp"]==1 else f'{d["max_iter_cp"]} sub-iterations' for d in filtered_dicts]
+        generate_loss_plot(array, os.path.join(output_folder, f'lmbda_{val}.png'), labels=labels)
+    
+
             
-            if max_iter:   
-                generate_loss_plot(loss_array[im], os.path.join(output_folder, f'loss_per_group_image_{im}.png'),max_iter=max_iter, labels=labels)
 
     return True
 
@@ -140,8 +131,8 @@ def create_tabular(df, output_folder, filename):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--storage_path', required=True, help='Storage path (automatically filled y quanat).')
-    parser.add_argument('--one_plot', action='store_true', help='Creates only one plot when True')
-    parser.add_argument('--max_iter', type=int, default=None, help='If specified, defines the number of iterations to plot')
+    parser.add_argument('--max_iter', type=int, default=None)
+    parser.add_argument('--min_iter', type=int, default=0)
     parser.add_argument('--out', type=str, help='Output folder name (stored in run folder).', default="metrics")
     args = parser.parse_args()
 
@@ -151,4 +142,4 @@ if __name__ == "__main__":
 
     print(f"Analyse des résultats : {args.storage_path}")
     
-    analyze_results(args.storage_path, output_folder, args.one_plot, args.max_iter)
+    analyze_results(args.storage_path, output_folder, args.min_iter, args.max_iter)
