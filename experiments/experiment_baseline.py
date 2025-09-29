@@ -10,8 +10,8 @@ from experiment_helpers import *
 
 setup_paths()
 from pansharpening import PANDataset
-from alg2 import PANTVCB
-from alg3 import PANTVGradAlignment
+from pan_ctv import PANTVCB
+from pan_ctv_grad_align import PANTVGradAlignment
 from nabla import nabla
 from metrics import compute_metrics
 
