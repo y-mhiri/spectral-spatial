@@ -16,21 +16,21 @@ plt.rc('font', family='serif')
 def generate_loss_plot(loss_data, filename, max_iter=None, labels=None):
 
 
-    plt.figure(figsize=(8, 5))
-    
+    plt.figure(figsize=(15, 12))
+    markers = iter(['o', 'v', 's', 'D', 'P','X'])
     # Tracé pour chaque image
     for i, loss in enumerate(loss_data):
         label = labels[i] if labels is not None else f'graph_{i}'
         if max_iter is None:
-            plt.plot(loss, label=label)
+            plt.plot(loss, label=label, marker=next(markers))
         else:
-            plt.plot(loss[0:max_iter], label=label)
+            plt.plot(loss[0:max_iter], label=label,marker=next(markers))
     
     plt.xlabel('Number of iterations')
     plt.ylabel('Objective function (in log scale)')
     plt.title('')
     plt.yscale('log')
-    plt.ylim(100,400)
+    # plt.ylim(100,400)
     plt.legend()
     plt.grid(True)
     
