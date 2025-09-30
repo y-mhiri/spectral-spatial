@@ -159,11 +159,12 @@ def analyze_results(storage_path, output_folder):
             df_metrics = pd.concat([df_metrics, curr_df], ignore_index=True) 
 
     df_metrics.to_csv(os.path.join(output_folder,'metrics.csv'))
-    best_idxs = df_metrics.groupby('noise_level').idxmax()
-    best_lambdas = {'SSIM' : df_metrics.loc[best_idxs['SSIM']],
-                    'CC' : df_metrics.loc[best_idxs['CC']],
-                    'SAM' : df_metrics.loc[best_idxs['SAM']],
-                    'PSNR' : df_metrics.loc[best_idxs['PSNR']],
+    best_idxs_max = df_metrics.groupby('noise_level').idxmax()
+    best_idxs_min = df_metrics.groupby('noise_level').idxmin()
+    best_lambdas = {'SSIM' : df_metrics.loc[best_idxs_max['SSIM']],
+                    'CC' : df_metrics.loc[best_idxs_max['CC']],
+                    'SAM' : df_metrics.loc[best_idxs_min['SAM']],
+                    'PSNR' : df_metrics.loc[best_idxs_max['PSNR']],
                     }
     
     for key, df in best_lambdas.items():
