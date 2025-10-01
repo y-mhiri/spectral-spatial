@@ -73,7 +73,8 @@ def analyze_results(storage_path, output_folder, min_iter, max_iter):
     for group_path in groups:    
 
         if os.path.isfile(os.path.join(group_path, 'info.yaml')):
-            
+
+            group_num = group_path.split('group_')[-1]            
             losses, metadata = fetch_group_results(group_path)
             if metadata['max_iter_cp'] not in max_iter_cp_val:
                 max_iter_cp_val.append(metadata['max_iter_cp'])
@@ -81,24 +82,33 @@ def analyze_results(storage_path, output_folder, min_iter, max_iter):
             if metadata['lmbda'] not in lmbda_val:
                 lmbda_val.append(metadata['lmbda'])
 
-            losses_dicts.append({'max_iter_cp': metadata['max_iter_cp'], 
+            losses_dicts.append({'group_num': group_num,
+                                 'max_iter_cp': metadata['max_iter_cp'], 
                                  'lmbda' : metadata['lmbda'], 
                                  'losses': losses[0,min_iter:max_iter] if max_iter else losses[0,min_iter:]})
         else:
             print(f'No finished run found at {group_path}.')            
     
-    for val in max_iter_cp_val:
-        filtered_dicts = [d for d in losses_dicts if d['max_iter_cp'] == val]
-        array = np.array([np.reshape(d['losses'],(d['losses'].shape[-1], -1)) for d in filtered_dicts])
-        labels = [f'$\lambda = {d["lmbda"]}$' for d in filtered_dicts]
-        generate_loss_plot(array, os.path.join(output_folder, f'max_iter_cp_{val}.png'), labels=labels)
+    try:
+        for val in max_iter_cp_val:
 
-    for val in lmbda_val:
-        filtered_dicts = [d for d in losses_dicts if d['lmbda'] == val]
-        array = np.array([np.reshape(d['losses'],(d['losses'].shape[-1], -1)) for d in filtered_dicts])
-        labels = [f'{d["max_iter_cp"]} sub-iteration' if d["max_iter_cp"]==1 else f'{d["max_iter_cp"]} sub-iterations' for d in filtered_dicts]
-        generate_loss_plot(array, os.path.join(output_folder, f'lmbda_{val}.png'), labels=labels)
+            filtered_dicts = [d for d in losses_dicts if d['max_iter_cp'] == val]
+            array = np.array([np.reshape(d['losses'],(d['losses'].shape[-1], -1)) for d in filtered_dicts])
+            generate_loss_plot(array, os.path.join(output_folder, f'max_iter_cp_{val}.png'), labels=labels)
+
+        for val in lmbda_val:
+            filtered_dicts = [d for d in losses_dicts if d['lmbda'] == val]
+            array = np.array([np.reshape(d['losses'],(d['losses'].shape[-1], -1)) for d in filtered_dicts])
+            labels = [f'{d["max_iter_cp"]} sub-iteration' if d["max_iter_cp"]==1 else f'{d["max_iter_cp"]} sub-iterations' for d in filtered_dicts]
+            generate_loss_plot(array, os.path.join(output_folder, f'lmbda_{val}.png'), labels=labels)
     
+    except:
+        for d in losses_dicts:
+            array = d['losses'].reshape(1,-1)
+            val = d['lmbda']
+            print(f'plotting group {val}')
+            generate_loss_plot(array, os.path.join(output_folder, f'lambda_{val}.png'), max_iter=max_iter)
+
 
             
 
