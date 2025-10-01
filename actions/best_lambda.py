@@ -139,15 +139,17 @@ def analyze_results(storage_path, output_folder):
 
     groups = glob.glob(os.path.join(storage_path,'group_*'))
 
-    columns = ['lmbda', 'noise_level', 'SSIM', 'CC', 'SAM', 'PSNR']
+    columns = ['group_num', 'lmbda', 'noise_level', 'SSIM', 'CC', 'SAM', 'PSNR']
     df_metrics = pd.DataFrame(columns=columns)
 
     for group_path in groups:
 
+        group_num = group_path.split('group_')[-1]
         if os.path.isfile(os.path.join(group_path, 'info.yaml')):
             reconstructed, metadata = fetch_group_results(group_path)
         
-            curr_df = pd.DataFrame( {'lmbda' : metadata['lmbda'],
+            curr_df = pd.DataFrame( {'group_num': group_num,
+                        'lmbda' : metadata['lmbda'],
                        'noise_level' : metadata['noise_level'], 
                        'SSIM' : metadata['SSIM'],
                        'CC' : metadata['CC'],
