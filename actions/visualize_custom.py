@@ -111,7 +111,7 @@ def load_all_image_data(metadata):
 def save_visualization_set(image_data, group_num, img_idx, algorithm, rgb_indices, output_dir):
     """Save complete visualization set for one image"""
     
-    viz_types = ['rgb', 'eigenimage']
+    viz_types = ['rgb']
     image_sources = ['groundtruth', 'hsi_noisy', 'reconstructed']
     
     for viz_type in viz_types:
@@ -122,6 +122,11 @@ def save_visualization_set(image_data, group_num, img_idx, algorithm, rgb_indice
                 # Extract visualization
                 if viz_type == 'rgb':
                     img = extract_rgb_image(data, rgb_indices)
+                    print(f'{source}')
+                    print(f'mean : {np.mean(data)}')
+                    print(f'std: {np.std(data)}')
+                    print(f'max: {np.max(data)}')
+                    print(f'min: {np.min(data)}')
                 elif viz_type == 'eigenimage':
                     img = extract_eigenimage_rgb(data)
                 
@@ -166,6 +171,8 @@ def visualize_group(metadata, output_dir):
         
         # Generate visualizations for each image
         for img_idx in range(num_images):
+            print(f'image {img_idx}')
+
             save_visualization_set(image_data, group_num, img_idx, algorithm, 
                                  rgb_indices, output_dir)
         

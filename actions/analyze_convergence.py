@@ -85,6 +85,7 @@ def analyze_results(storage_path, output_folder, min_iter, max_iter):
             losses_dicts.append({'group_num': group_num,
                                  'max_iter_cp': metadata['max_iter_cp'], 
                                  'lmbda' : metadata['lmbda'], 
+                                 'noise_level' : metadata['noise_level'],
                                  'losses': losses[0,min_iter:max_iter] if max_iter else losses[0,min_iter:]})
         else:
             print(f'No finished run found at {group_path}.')            
@@ -106,8 +107,9 @@ def analyze_results(storage_path, output_folder, min_iter, max_iter):
         for d in losses_dicts:
             array = d['losses'].reshape(1,-1)
             val = d['lmbda']
+            noise_level = d['noise_level']
             print(f'plotting group {val}')
-            generate_loss_plot(array, os.path.join(output_folder, f'lambda_{val}.png'), max_iter=max_iter)
+            generate_loss_plot(array, os.path.join(output_folder, f'lambda_{val}_{noise_level}.png'), max_iter=max_iter)
 
 
             

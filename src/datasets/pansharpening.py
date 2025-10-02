@@ -114,12 +114,13 @@ class PANDataset(data.Dataset):
         img = torch.from_numpy(self.file[self.split][str(idx)][:]).float()
         img = img.permute(2, 0, 1)  # (H,W,C) -> (C,H,W)
         
-        if self.normalize:
-            img = (img - img.min()) / (img.max() - img.min())
             
         if self.transform:
             img = self.transform(img)
-                
+
+        if self.normalize:
+            img = (img - img.amin(dim=(1,2), keepdim=True)) / (img.amax(dim=(1,2), keepdim=True) - img.amin(dim=(1,2), keepdim=True) + 1e-8)
+
         return img.to(self.device)
     
 
