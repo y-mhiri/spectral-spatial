@@ -119,7 +119,8 @@ class PANDataset(data.Dataset):
             img = self.transform(img)
 
         if self.normalize:
-            img = (img - img.amin(dim=(1,2), keepdim=True)) / (img.amax(dim=(1,2), keepdim=True) - img.amin(dim=(1,2), keepdim=True) + 1e-8)
+            # img = (img - img.amin(dim=(1,2), keepdim=True)) / (img.amax(dim=(1,2), keepdim=True) - img.amin(dim=(1,2), keepdim=True) + 1e-8)
+            img = (img - img.min()) / (img.max() - img.min() + 1e-8)
 
         return img.to(self.device)
     
