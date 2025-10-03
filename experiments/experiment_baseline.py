@@ -130,7 +130,7 @@ def main():
         total_time += compute_time
         
         # Store results
-        reconstructed = torch.clamp(min=0, max=1)
+        reconstructed = torch.clamp(reconstructed, min=0.0, max=1.0)
         reconstructed_ar[j] = reconstructed
         loss_ar[j] = loss
         relval_ar[j] = relval
