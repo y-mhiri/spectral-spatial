@@ -25,7 +25,7 @@ class GradientWeights:
     def soft_threshold(tau=1.0):
         """Soft thresholding with sigmoid transition"""
         def weight_fn(c, alpha):
-            return torch.stack((torch.ones_like(c),sigmoid((c - alpha)/tau)), dim=-1).transpose(-2, -1)
+            return torch.stack((torch.ones_like(c), torch.ones_like(c) - sigmoid((c - alpha)/tau)), dim=-1).transpose(-2, -1)
         return weight_fn
 
 
