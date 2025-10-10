@@ -17,6 +17,7 @@ from pan_ctv_grad_align import PANTVGradAlignment
 from nabla import nabla
 from metrics import compute_metrics
 from skimage.filters import threshold_otsu
+from torch.nn import Sigmoid
 
 def main():
     parser = argparse.ArgumentParser()
@@ -38,6 +39,7 @@ def main():
     parser.add_argument("--scale", type=int, default=4)
     
     parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--tau", type=float, nargs='+', default=[1.0])
     
     # PANTVGradAlign specific
     parser.add_argument("--threshold_type", type=str, default="soft", choices=["hard", "soft"])
@@ -68,23 +70,31 @@ def main():
 
         
         alpha = threshold_otsu(c_n)
+        # alpha = torch.quantile(c_n, 0.75)
         print(f'alpha = {alpha}')   
 
-        plt.figure()
-        plt.imshow(Y_M.squeeze())
-        plt.savefig(os.path.join(args.storage_path, f'{j}_images.png'))
+        for t in args.tau:
+            mask = Sigmoid()((criterion - alpha)/t)
+
+            plt.figure()
+            # plt.imshow(Y_M.squeeze())
+            plt.imshow(mask, vmin=0, vmax=1)
+            plt.colorbar()
+        # plt.savefig(os.path.join(args.storage_path, f'{j}_images.png'))
 
         plt.figure()
         plt.hist(c_n.flatten(),bins=256)
-        plt.savefig(os.path.join(args.storage_path, f'{j}_criterion.png'))
+        plt.axvline(x=alpha, color='red')
+        # plt.savefig(os.path.join(args.storage_path, f'{j}_criterion.png'))
         
         plt.figure()
         plt.hist(grad_norm.flatten(), bins=256)
-        plt.savefig(os.path.join(args.storage_path, f'{j}_grad_norm.png'))
+        # plt.savefig(os.path.join(args.storage_path, f'{j}_grad_norm.png'))
+    
 
     torch.cuda.empty_cache()
     
-    # Save results
+    plt.show()
     
 
 if __name__ == "__main__":
