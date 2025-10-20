@@ -31,7 +31,7 @@ class PANProximalGradient(nn.Module):
         self.max_iter = max_iter
         self.scale = scale
         self.lmbda = lmbda
-        self.alpha = alpha
+        self.alpha = alpha # unused
         self.lmbda_m = lmbda_m
         self.tol = tol
         self.verbose = verbose
