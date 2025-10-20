@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--dtype", type=str, default="float32")
     parser.add_argument("--storage_path", type=str, required=True)
     parser.add_argument("--dataset_path", type=str, required=True)
+    parser.add_argument("--save_fig", type='store_true')
     
     # Data parameters
     parser.add_argument("--seed", type=int, default=42)
@@ -80,16 +81,22 @@ def main():
             # plt.imshow(Y_M.squeeze())
             plt.imshow(mask, vmin=0, vmax=1)
             plt.colorbar()
-        # plt.savefig(os.path.join(args.storage_path, f'{j}_images.png'))
+
+        if args.save_fig:
+            plt.savefig(os.path.join(args.storage_path, f'{j}_images.png'))
 
         plt.figure()
         plt.hist(c_n.flatten(),bins=256)
         plt.axvline(x=alpha, color='red')
-        # plt.savefig(os.path.join(args.storage_path, f'{j}_criterion.png'))
+
+        if args.save_fig:
+            plt.savefig(os.path.join(args.storage_path, f'{j}_criterion.png'))
         
         plt.figure()
         plt.hist(grad_norm.flatten(), bins=256)
-        # plt.savefig(os.path.join(args.storage_path, f'{j}_grad_norm.png'))
+
+        if args.save_fig:
+            plt.savefig(os.path.join(args.storage_path, f'{j}_grad_norm.png'))
     
 
     torch.cuda.empty_cache()
