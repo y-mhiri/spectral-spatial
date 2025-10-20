@@ -1,8 +1,8 @@
 import torch
 from math import sqrt
-from chambolle_pock import ChambollePock  # ta base ci-dessus
-from nabla import nabla, nabla_adjoint         # tes opérateurs grad/div adjoints
-
+from chambolle_pock import ChambollePock 
+from nabla import nabla, nabla_adjoint        
+ 
 class TVPrior(ChambollePock):
     """
     Prior CTV l^{p,q,r} pour Chambolle–Pock avec projections duales:
