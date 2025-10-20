@@ -31,30 +31,19 @@ class GradientWeights:
 
 class TVGradAlignment(ChambollePock):
     def __init__(self, grad_panc, p, q, r, 
-                 threshold_type='soft',  # 'soft' or 'hard'
-                 alpha=0.1,             # threshold value
-                 threshold_param=1.0,   # epsilon (hard) or tau (soft)
+                 threshold_param=1.0,   # tune how smooth the sigmoid threshold is
                  *args, **kwargs):
         """
         Args:
             grad_panc: Panchromatic image gradients
             p, q, r: Norm parameters
-            threshold_type: 'soft' or 'hard' thresholding strategy
-            alpha: Threshold value
             threshold_param: epsilon (for hard) or tau (for soft)
         """
         super().__init__(*args, **kwargs)
 
-        # Select weight function based on threshold type
-        if threshold_type == 'hard':
-            self.weight_fun = GradientWeights.hard_threshold(epsilon=threshold_param)
-        elif threshold_type == 'soft':
-            self.weight_fun = GradientWeights.soft_threshold(tau=threshold_param)
-        else:
-            raise ValueError("threshold_type must be 'hard' or 'soft'")
+        self.weight_fun = GradientWeights.soft_threshold(tau=threshold_param)
 
-        # Normalize alpha relative to gradient magnitudes
-        #self.alpha = alpha / (torch.mean(norm(grad_panc, dim=-1)) + 1e-7)  
+        # Compute threshold using Otsu on the gradient of the PAN image.
         self.alpha = self.compute_alpha_from_pan(grad_panc)      
         self.W = self._compute_weights(grad_panc)
         self.p = p
