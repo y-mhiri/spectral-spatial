@@ -53,7 +53,6 @@ def main():
     parser.add_argument("--theta_cp", type=float, default=1.0)
     
     # PANTVGradAlign specific
-    parser.add_argument("--threshold_type", type=str, default="soft", choices=["hard", "soft"])
     parser.add_argument("--threshold_param", type=float, default=0.5)
     
     args = parser.parse_args()
@@ -82,8 +81,6 @@ def main():
         grad_panc = nabla(first_pan)
         chambolle_params.update({
             'grad_panc': grad_panc,
-            'threshold_type': args.threshold_type,
-            'alpha': args.alpha,
             'threshold_param': args.threshold_param
         })
     
@@ -116,8 +113,6 @@ def main():
             grad_panc = nabla(Y_M)
             chambolle_params.update({
                 'grad_panc': grad_panc,
-                'threshold_type': args.threshold_type,
-                'alpha': args.alpha,
                 'threshold_param': args.threshold_param
             })
             optim = PANTVGradAlignment(A=A, Aadj=A_adj, spectral_op=R, spectral_op_t=R_adj,
