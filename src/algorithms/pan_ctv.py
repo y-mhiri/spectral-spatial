@@ -1,7 +1,7 @@
 import torch
-from nabla import nabla, nabla_adjoint
-from pan_proximal_gradient import PANProximalGradient
-from prox_tv_prior import TVPrior
+from .nabla import nabla, nabla_adjoint
+from .pan_proximal_gradient import PANProximalGradient
+from .prox_tv_prior import TVPrior
 
 class PANCTV(PANProximalGradient):
     """
