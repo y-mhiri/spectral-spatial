@@ -1,59 +1,8 @@
-import sys
 import os
-import torch
-import zarr
-import time
 import yaml
 from datetime import datetime
-from torchvision import transforms
 
-def setup_paths():
-    """Setup system paths for imports"""
-    path = os.path.join(os.getenv("HOME_DATA"), 'spectral-spatial/src')
-    sys.path.append(os.path.join(path, 'datasets'))
-    sys.path.append(os.path.join(path, 'algorithms'))
-    sys.path.append(os.path.join(path, 'metrics'))
-    sys.path.append(os.path.join(os.getenv("HOME_DATA"), 'spectral-spatial', 'experiments'))
 
-def setup_device_and_dtype(args):
-    """Setup device and data type"""
-    device = args.device
-    dtype = torch.float32 if args.dtype == "float32" else torch.float64
-    torch.manual_seed(args.seed)
-    return device, dtype
-
-def create_dataset(args, device, dtype):
-    """Create dataset with appropriate transforms and normalization"""
-    crop_transform = transforms.Compose([transforms.CenterCrop(args.crop_size)]) if args.crop_center else None
-    
-    # Normalize sigma by crop size for consistency
-    sigma_norm = args.sigma / (args.crop_size * args.crop_size) if args.crop_center else args.sigma
-    # noise_norm = args.noise_level / (args.crop_size * args.crop_size) if args.crop_center else args.noise_level
-    noise_norm = 10**(-args.noise_level/10)/args.crop_size
-    
-    from pansharpening import PANDataset
-    return PANDataset(
-        root_dir=args.dataset_path,
-        split='train',
-        transform=crop_transform,
-        normalize=True,
-        scale=args.scale,
-        sigma=sigma_norm,
-        sigma1=noise_norm,
-        device=device,
-        size=args.crop_size if args.crop_center else None,
-        seed=args.seed
-    )
-
-def setup_chambolle_params(args):
-    """Setup Chambolle-Pock parameters"""
-    return {
-        'max_iter': args.max_iter_cp,
-        'lmbda': args.lmbda,
-        'theta': args.theta_cp,
-        'sigma': args.sigma_cp,
-        'tau': 0.99 / args.sigma_cp
-    }
 
 def save_experiment_info(out_path, args, total_time, metrics, algorithm_name):
     """Save experiment information to YAML"""
@@ -90,12 +39,6 @@ def store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, tot
     root.create_dataset('loss', data=loss_ar.cpu().numpy(),shape=loss_ar.shape)
     root.create_dataset('relval', data=relval_ar.cpu().numpy(),shape=relval_ar.shape)
 
-def run_optimization(optim, Y_H, Y_M):
-    """Run optimization and return results with timing"""
-    start_time = time.time()
-    reconstructed, loss, relval = optim(Y_H, Y_M)
-    compute_time = time.time() - start_time
-    return reconstructed, loss, relval, compute_time
 
 def print_experiment_info(args, algorithm_name):
     """Print experiment information"""

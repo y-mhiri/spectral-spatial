@@ -3,7 +3,7 @@ from nabla import nabla, nabla_adjoint
 from pan_proximal_gradient import PANProximalGradient
 from prox_tv_prior import TVPrior
 
-class PANTVCB(PANProximalGradient):
+class PANCTV(PANProximalGradient):
     """
     Calcul de l'opérateur proximale de la TV vectorielle en utilisant chamboll pock.
     Attributs:
@@ -14,17 +14,34 @@ class PANTVCB(PANProximalGradient):
        cette fonction donne l'opérateur proximale de l'image d'entrée en faisant un algo de chamboll pock
 
     """
-    def __init__(self, params, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, init_params, *args, **kwargs):
 
-        params['p'] = self.p
-        params['q'] = self.q
-        params['r'] = self.r
+        """
+        Params:
+        -------
+        init_params (dict) : Stores the parameters to initialize a TVPrior object. 
+        max_iter (int): Nombre maximal d'itérations
+        lmbda (float): Paramètre de régularisation TV
+        lmbda_m (float): Poids de l'attache aux données multispectrales
+        tol (float): Tolérance de convergence
+        scale (int): Facteur d'échelle
+        verbose (bool): Affichage des informations
+        A (function): Opérateur de sous-échantillonnage
+        Aadj (function): Adjoint de l'opérateur A
+        R (torch.Tensor): Matrice de projection panchromatique
 
-        self.optim = TVPrior(**params)
+        """
+
+        super().__init__(*args, **kwargs) # Initialize a PANProximalGradient object from *args and **kwargs
+
+        init_params['p'] = self.p
+        init_params['q'] = self.q
+        init_params['r'] = self.r
+
+        self.optim = TVPrior(**init_params)
 
 
-    def proxg(self,x):
+    def proxg(self,x, gamma=1):
         """
         Donne l'opérateur proximale de la tv vectorielle avec chamboll pock ....
         
@@ -38,6 +55,7 @@ class PANTVCB(PANProximalGradient):
         params['prox_tau_f'] = {'y': x, 'sigma2': 1}
         params['loss_fn'] = {}
 
+        self.optim.lmbda = self.optim.lmbda * gamma
 
         return self.optim(x,init=None, verbose=False, params=params, return_loss=False)
     

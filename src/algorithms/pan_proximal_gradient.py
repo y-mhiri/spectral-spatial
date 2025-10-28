@@ -1,14 +1,8 @@
 import sys
 import torch
-import math 
 import logging
 import torch.nn as nn
-from tqdm.auto import tqdm
-from nabla import nabla
-from datetime import datetime
 
-sys.path.append('src/datasets')
-sys.path.append('src/algorithms')
 
 class PANProximalGradient(nn.Module):
     """
@@ -26,12 +20,11 @@ class PANProximalGradient(nn.Module):
         R (torch.Tensor): Matrice de projection panchromatique
     """
 
-    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda,alpha, lmbda_m, tol,scale,p,q,r,verbose):
+    def __init__(self, A, Aadj,spectral_op,spectral_op_t,max_iter, lmbda, lmbda_m, tol,scale,p,q,r,verbose):
         super().__init__()
         self.max_iter = max_iter
         self.scale = scale
         self.lmbda = lmbda
-        self.alpha = alpha # unused
         self.lmbda_m = lmbda_m
         self.tol = tol
         self.verbose = verbose
@@ -127,7 +120,7 @@ class PANProximalGradient(nn.Module):
         
         return grad1 + grad2
     
-    def proxg(self, x):
+    def proxg(self, x, gamma=1):
         """Opérateur proximal (à implémenter)."""
         raise NotImplementedError("prox() is not implemented in abstract class.")
     
@@ -155,7 +148,7 @@ class PANProximalGradient(nn.Module):
             grad = self.grad_f(U, Y_H, Y_M)
 
             # Mise à jour ISTA
-            U = self.proxg(U - self.alpha * grad)
+            U = self.proxg(U - self.alpha * grad, gamma=self.alpha)
 
             # Calcul du coût
             total_cost, data_term_h, data_term_m, tv_term = self.compute_cost(U, Y_H, Y_M)

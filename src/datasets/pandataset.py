@@ -5,6 +5,7 @@ from torchvision.transforms.functional import gaussian_blur
 import zarr
 from torch.utils import data
 import deepinv as dinv
+from math import sqrt
 from deepinv.physics import GaussianNoise, Denoising
 
 class PANDataset(data.Dataset):
@@ -17,7 +18,7 @@ class PANDataset(data.Dataset):
         transform (callable): Transformations à appliquer aux données
         normalize (bool): Si True, normalise les données entre 0 et 1
         scale (int): Facteur de sous-échantillonnage
-        sigma (float): Paramètre du flou gaussien
+        sigma_blur (float): Paramètre du flou gaussien
         device (str): Device pour les opérations ('cpu' ou 'cuda')
         nband (int): Nombre de bandes spectrales
         height (int): Hauteur des images
@@ -31,7 +32,7 @@ class PANDataset(data.Dataset):
     """
 
     def __init__(self, root_dir, split='train', transform=None, normalize=False, 
-                 scale=4, sigma=0.001,sigma1 = 0.001, device="cpu", size=None, seed=0):
+                 scale=4, sigma_blur=0.001, noise_level = 0.001, device="cpu", seed=0):
         """
         Args:
             root_dir (str): Chemin vers le fichier Zarr
@@ -39,9 +40,9 @@ class PANDataset(data.Dataset):
             transform (callable): Transformations à appliquer
             normalize (bool): Normalisation [0,1] si True
             scale (int): Facteur de sous-échantillonnage
-            sigma (float): Paramètre du flou gaussien
+            sigma_blur (float): Paramètre du flou gaussien
+            noise_level (float) : noise variance 
             device (str): Device pour les opérations
-            size (int): Taille de redimensionnement optionnelle
         """
         super().__init__()
         # Initialisation des attributs
@@ -50,8 +51,7 @@ class PANDataset(data.Dataset):
         self.transform = transform
         self.normalize = normalize
         self.scale = scale
-        self.sigma = sigma
-        self.sigma1 = sigma1
+        self.sigma_blur = sigma_blur
         self.device = device
         self.seed = seed
         
@@ -63,16 +63,15 @@ class PANDataset(data.Dataset):
 
         # Dimensions des données
         self.nband = self.file[self.split][str(0)][:].shape[2]
-        self.height = size if size else self.file[self.split][str(0)][:].shape[0]
-        self.width = size if size else self.file[self.split][str(0)][:].shape[1]
-        
-        self._init_operators()
-
-    def _init_operators(self):
-        """Initialise les opérateurs de flou et sous-échantillonnage"""
+        self.height = self.file[self.split][str(0)][:].shape[0]
+        self.width = self.file[self.split][str(0)][:].shape[1]
         img_size = (self.nband, self.height, self.width)
+
+        self.noise_level =  10**(-noise_level/20) 
+        
+        self.R = (1/self.nband)*torch.ones(1,self.nband, device=self.device) 
         self.blur_op = Blur(
-            filter=self._kernel_gaussien(),
+            filter=dinv.physics.blur.gaussian_blur(sigma=(self.sigma_blur,self.sigma_blur), angle=0.0),
             padding='circular',
             device=self.device
         )
@@ -83,16 +82,6 @@ class PANDataset(data.Dataset):
             padding='circular',
             device=self.device
         )
-        self.R = self.create_spectral_matrix()
-
-    def _kernel_gaussien(self):
-        """
-        Crée un filtre gaussien 2D
-        
-        Returns:
-            torch.Tensor: Kernel gaussien de shape [1, 1, k, k]
-        """
-        return dinv.physics.blur.gaussian_blur(sigma=(self.sigma,self.sigma), angle=0.0)
     
     def __len__(self):
         """
@@ -119,7 +108,6 @@ class PANDataset(data.Dataset):
             img = self.transform(img)
 
         if self.normalize:
-            # img = (img - img.amin(dim=(1,2), keepdim=True)) / (img.amax(dim=(1,2), keepdim=True) - img.amin(dim=(1,2), keepdim=True) + 1e-8)
             img = (img - img.min()) / (img.max() - img.min() + 1e-8)
 
         return img.to(self.device)
@@ -150,7 +138,7 @@ class PANDataset(data.Dataset):
             raise ValueError("L'image doit être un tenseur 4D [b,c,h,w]")
         return self.noise(self.downsample_op(self.blur_op(input_image))) if noise else self.downsample_op(self.blur_op(input_image))
 
-    def get_panchromatic(self, input_image, noise=True):
+    def simulate_panchromatic(self, input_image, noise=True):
         """
         Calcule l'image panchromatique par moyenne spectrale
         
@@ -161,20 +149,7 @@ class PANDataset(data.Dataset):
             torch.Tensor: Image panchromatique [b,1,h,w]
         """
         return self.noise(self.spectral_op(input_image)) if noise else self.spectral_op(input_image)
-    
-    def create_spectral_matrix(self):
-        """
-        Calcule la signature spectrale moyenne
-        
-        Args:
-            input_image (torch.Tensor): Image [b,c,h,w]
-            
-        Returns:
-            torch.Tensor: Vecteur spectral moyen [1,c]
-        """
-        c = self.nband
-        return (1/c)*torch.ones(1,c, device=self.device)
-    
+   
     def spectral_op(self,input_image):
         """
         Calcule la signature spectrale moyenne
@@ -185,14 +160,13 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Vecteur spectral moyen [1,c]
         """
-        input_image = input_image.contiguous()
-        U_flat = input_image.view(1,self.nband, -1)
-        RU = torch.matmul(self.R, U_flat.squeeze(0)).unsqueeze(0)
-        RU = RU.view(1, 1, self.height,self.width)
-        return RU
+        X = input_image.reshape(1,self.nband, -1)
+        RX = torch.matmul(self.R, X.squeeze(0)).unsqueeze(0)
+        RX = RX.reshape(1, 1, self.height,self.width)
+        return RX
     
 
-    def spectral_op_t(self,imput_image):
+    def spectral_op_t(self,input_image):
         """
         Calcule la signature spectrale moyenne
         
@@ -202,13 +176,13 @@ class PANDataset(data.Dataset):
         Returns:
             torch.Tensor: Vecteur spectral moyen [1,c]
         """
-        imput_image = imput_image.view(1, 1, -1)
-        RU_t = torch.matmul(self.R.t(), imput_image)
-        RU_t = RU_t.view(1,self.nband, self.height,self.width)
-        return RU_t
+        Y = input_image.reshape(1, 1, -1)
+        RtX = torch.matmul(self.R.t(), Y)
+        RtX = RtX.reshape(1,self.nband, self.height,self.width)
+        return RtX
 
     def noise(self,input_image):
-        noise_model = GaussianNoise(self.sigma1)
-        physics = Denoising(device=input_image.device, noise_model=noise_model)
+        noise_model = GaussianNoise(self.noise_level)
+        physics = Denoising(noise_model=noise_model)
         observation = physics(input_image)
         return observation

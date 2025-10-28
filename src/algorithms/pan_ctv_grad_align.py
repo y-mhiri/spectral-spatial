@@ -3,7 +3,7 @@ from nabla import nabla
 from pan_proximal_gradient import PANProximalGradient
 from prox_tv_grad_align import TVGradAlignment
 
-class PANTVGradAlignment(PANProximalGradient):
+class PANCTVGradAlignment(PANProximalGradient):
     """
     Calcul de l'opérateur proximale de la TV vectorielle en utilisant chamboll pock.
     Attributs:
@@ -20,13 +20,13 @@ class PANTVGradAlignment(PANProximalGradient):
         params['p'] = self.p
         params['q'] = self.q
         params['r'] = self.r
-        params['alpha'] = self.alpha
+ 
 
         self.optim = TVGradAlignment(**params)
         self.W = self.optim.W
 
 
-    def proxg(self,x):
+    def proxg(self,x, gamma=1):
         """
         Donne l'opérateur proximale de la tv vectorielle avec chamboll pock ....
         
@@ -40,7 +40,7 @@ class PANTVGradAlignment(PANProximalGradient):
         params['prox_tau_f'] = {'y': x, 'sigma2': 1}
         params['loss_fn'] = {}
 
-
+        self.optim.lmbda = self.optim.lmbda * gamma
         return self.optim(x,init=None, verbose=False, params=params, return_loss=False)
     
 
