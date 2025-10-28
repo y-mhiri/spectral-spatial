@@ -5,13 +5,13 @@ import os
 import torch
 import numpy as np
 
-sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from loaders import *
 from visualization_helpers import *
 
 setup_paths()
-from experiment_helpers import create_dataset, setup_device_and_dtype
-
+from src.datasets.pandataset import PANDataset
 
 def add_sub_figure(path, width):
 
@@ -44,6 +44,7 @@ def get_rgb_indices(dataset_path):
     """Get RGB band indices for dataset"""
     rgb_indices_map = {
         'harvard': [29, 19, 9],
+        'harvard_small': [29, 19, 9],
         'pavia': [55, 41, 12],
         'default': [0, 1, 2]
     }
@@ -60,9 +61,23 @@ def load_all_image_data(metadata):
     
     args = Args(**metadata.get('parameters', {}))
     
-    # Load dataset for ground truth and noisy images
-    device, dtype = setup_device_and_dtype(args)
-    dataset = create_dataset(args, device, dtype)
+
+        # Setup experiment
+    device = args.device
+    dtype = torch.float32 if args.dtype == "float32" else torch.float64
+    torch.manual_seed(args.seed)
+
+    # Open dataset
+    dataset = PANDataset(
+        root_dir=args.dataset_path,
+        split='train',
+        normalize=True,
+        scale=args.scale,
+        sigma_blur=args.sigma_blur,
+        noise_level=args.noise_level,
+        device=device,
+        seed=args.seed
+    )
     
     image_idx = getattr(args, 'image_idx', "6")
     
@@ -99,7 +114,7 @@ def load_all_image_data(metadata):
         all_data['hsi_noisy'].append(hsi_noisy)
         
         # Noisy panchromatic
-        pan_noisy = dataset.get_panchromatic(gt_batch, noise=True)[0].cpu().numpy()
+        pan_noisy = dataset.simulate_panchromatic(gt_batch, noise=True)[0].cpu().numpy()
         all_data['pan_noisy'].append(pan_noisy)
         
         # Reconstructed (if available)
