@@ -116,7 +116,7 @@ def main():
         # Setup optimizer
         if args.algorithm == 'CTV':
             optim = PANCTV(A=A, Aadj=A_adj, spectral_op=R, spectral_op_t=R_adj,
-                           max_iter=args.max_iter, lmbda=args.lmbda,
+                           max_iter=args.max_iter, lmbda=args.lmbda * sigma2,
                            lmbda_m=args.lmbda_m, tol=args.tol, scale=dataset.scale,
                            p=args.p, q=args.q, r=args.r, verbose=True, init_params=chambolle_params)
         elif args.algorithm == 'GradAlign':
@@ -128,7 +128,7 @@ def main():
                 'threshold': args.threshold
             })
             optim = PANCTVGradAlignment(A=A, Aadj=A_adj, spectral_op=R, spectral_op_t=R_adj,
-                                     max_iter=args.max_iter, lmbda=args.lmbda, 
+                                     max_iter=args.max_iter, lmbda=args.lmbda * sigma2, 
                                      lmbda_m=args.lmbda_m, tol=args.tol, scale=dataset.scale,
                                      p=args.p, q=args.q, r=args.r, verbose=True, init_params=chambolle_params)
         else: 
