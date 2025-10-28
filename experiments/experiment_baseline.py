@@ -98,7 +98,7 @@ def main():
     
     # Initialization
     metrics = {}
-    reconstructed_ar = torch.zeros([len(subset), dataset.nband, args.crop_size, args.crop_size], 
+    reconstructed_ar = torch.zeros([len(subset), dataset.nband, dataset.width, dataset.height], 
                                   device=device, dtype=dtype)
     loss_ar = torch.zeros([len(subset), args.max_iter], device=device, dtype=dtype)
     relval_ar = torch.zeros([len(subset), args.max_iter], device=device, dtype=dtype)
