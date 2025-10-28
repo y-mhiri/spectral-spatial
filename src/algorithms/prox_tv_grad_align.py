@@ -4,10 +4,10 @@ from chambolle_pock import ChambollePock
 from skimage.filters import threshold_otsu
 from math import sqrt
 from torch.linalg import svd, norm
-from nabla import nabla, nabla_adjoint
 from torch.nn.functional import sigmoid
 
-from dual_projections import select_dual_projection
+from .nabla import nabla, nabla_adjoint
+from .dual_projections import select_dual_projection
 
 def compute_alpha_from_pan(pan_image):
     """

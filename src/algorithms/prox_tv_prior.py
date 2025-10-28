@@ -1,8 +1,8 @@
 import torch
 from math import sqrt
-from chambolle_pock import ChambollePock 
-from nabla import nabla, nabla_adjoint        
-from dual_projections import select_dual_projection
+from .chambolle_pock import ChambollePock 
+from .nabla import nabla, nabla_adjoint        
+from .dual_projections import select_dual_projection
  
 class TVPrior(ChambollePock):
     """
