@@ -30,7 +30,7 @@ def main():
     parser.add_argument("--image_idx", type=str, default=None)
     parser.add_argument("--noise_level", type=float, required=True)
     parser.add_argument("--sigma_blur", type=float, required=True)
-    parser.add_argument("--clean_pan", type='store_true')
+    parser.add_argument("--clean_pan", action='store_true')
     parser.add_argument("--scale", type=int, required=True)
     
     # Algorithm parameters
