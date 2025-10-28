@@ -118,7 +118,7 @@ def main():
             optim = PANCTV(A=A, Aadj=A_adj, spectral_op=R, spectral_op_t=R_adj,
                            max_iter=args.max_iter, lmbda=args.lmbda,
                            lmbda_m=args.lmbda_m, tol=args.tol, scale=dataset.scale,
-                           p=args.p, q=args.q, r=args.r, verbose=True, params=chambolle_params)
+                           p=args.p, q=args.q, r=args.r, verbose=True, init_params=chambolle_params)
         elif args.algorithm == 'GradAlign':
 
             grad_panc = nabla(Y_M)
@@ -130,7 +130,7 @@ def main():
             optim = PANCTVGradAlignment(A=A, Aadj=A_adj, spectral_op=R, spectral_op_t=R_adj,
                                      max_iter=args.max_iter, lmbda=args.lmbda, 
                                      lmbda_m=args.lmbda_m, tol=args.tol, scale=dataset.scale,
-                                     p=args.p, q=args.q, r=args.r, verbose=True, params=chambolle_params)
+                                     p=args.p, q=args.q, r=args.r, verbose=True, init_params=chambolle_params)
         else: 
             raise NotImplementedError(f'{args.algorithms} not implemented. Try either CTV or GradAlign.')        
 

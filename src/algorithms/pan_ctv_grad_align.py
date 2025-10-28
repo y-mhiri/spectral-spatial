@@ -14,15 +14,15 @@ class PANCTVGradAlignment(PANProximalGradient):
        cette fonction donne l'opérateur proximale de l'image d'entrée en faisant un algo de chamboll pock
 
     """
-    def __init__(self, params, *args, **kwargs):
+    def __init__(self, init_params, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        params['p'] = self.p
-        params['q'] = self.q
-        params['r'] = self.r
+        init_params['p'] = self.p
+        init_params['q'] = self.q
+        init_params['r'] = self.r
  
 
-        self.optim = TVGradAlignment(**params)
+        self.optim = TVGradAlignment(**init_params)
         self.W = self.optim.W
 
 
