@@ -1,11 +1,11 @@
 import torch
 
-from chambolle_pock import ChambollePock
 from skimage.filters import threshold_otsu
 from math import sqrt
 from torch.linalg import svd, norm
 from torch.nn.functional import sigmoid
 
+from .chambolle_pock import ChambollePock
 from .nabla import nabla, nabla_adjoint
 from .dual_projections import select_dual_projection
 
