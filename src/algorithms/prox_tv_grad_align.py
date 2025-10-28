@@ -171,7 +171,4 @@ class TVGradAlignment(ChambollePock):
         r"""
         Compute the loss function of the problem
         """
-        f = lambda u: (1/(2*sigma2))*norm(u - y)**2
-        reg = lambda p: lmbda*torch.sum(norm(torch.matmul(self.W,nabla(p).unsqueeze(-1)).squeeze(-1),dim=-1))#.squeeze(-1), dim=-1)
-
-        return f(u) + reg(u)
+        return 0 # unused ?

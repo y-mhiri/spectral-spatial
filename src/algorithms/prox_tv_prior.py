@@ -48,11 +48,9 @@ class TVPrior(ChambollePock):
 
         return proj_unit(Q, radius=lam)
 
-    # # (Optionnel) Pour du logging/visualisation :
-    # def loss_fn(self, u, y, lmbda, **kwargs):
-    #     """
-    #     f(u) = 0.5 ||u - y||^2 + λ * TV_{p,q,r}(u)  (valeur diagnostique)
-    #     """
-    #     data = 0.5 * torch.norm(u - y) ** 2
-    #     # NB: calculer exactement ||∇u||_{p,q,r} coûte ; à n'utiliser qu'en debug
-    #     return data
+
+    def loss_fn(self, u, y, lmbda, sigma2=1): #dépendance en sigma2
+        r"""
+        Compute the loss function of the problem
+        """
+        return 0 # unused ?
