@@ -72,7 +72,7 @@ def main():
     )
 
     # Select a subset of images 
-    if image_idx is None:
+    if args.image_idx is None:
         subset = dataset
     else:
         image_idx = [int(idx) for idx in args.image_idx.split(' ')]
