@@ -164,7 +164,7 @@ class TVGradAlignment(ChambollePock):
         lam = self.lmbda
         proj = select_dual_projection(self.p, self.q, self.r)
         
-        return proj(Q, radius=1/lam)
+        return proj(Q, radius=lam)
 
 
     def loss_fn(self, u, y, lmbda, sigma2=1): #dépendance en sigma2

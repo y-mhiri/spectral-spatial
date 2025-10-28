@@ -55,7 +55,7 @@ class PANCTV(PANProximalGradient):
         params['prox_tau_f'] = {'y': x, 'sigma2': 1}
         params['loss_fn'] = {}
 
-        self.optim.lmbda = self.optim.lmbda * gamma
+        # self.optim.lmbda = self.optim.lmbda * gamma
 
         return self.optim(x,init=None, verbose=False, params=params, return_loss=False)
     
