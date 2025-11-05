@@ -46,7 +46,7 @@ class TVPrior(ChambollePock):
         proj_unit = select_dual_projection(self.p, self.q, self.r)
         lam = self.lmbda
 
-        return proj_unit(Q, radius=1/lam)
+        return proj_unit(Q, radius=lam)
 
 
     def loss_fn(self, u, y, lmbda, sigma2=1): #dépendance en sigma2

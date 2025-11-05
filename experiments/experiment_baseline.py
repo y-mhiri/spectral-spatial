@@ -48,7 +48,7 @@ def main():
     parser.add_argument("--theta_cp", type=float, default=1.0)
     
     # PANTVGradAlign specific
-    parser.add_argument("--threshold_softness", type=float, default=1)
+    parser.add_argument("--threshold_softness", type=float, default=1e-5)
     parser.add_argument("--threshold", type=float, default=None)
     
     args = parser.parse_args()
