@@ -67,7 +67,7 @@ class TVGradAlignment(ChambollePock):
         self.weight_fun = GradientWeights.soft_threshold(tau=threshold_softness)
 
         # Compute threshold using Otsu on the gradient of the PAN image.
-        self.alpha = self.compute_alpha_from_pan(grad_panc) if threshold is None else threshold    
+        self.alpha = compute_alpha_from_pan(grad_panc) if threshold is None else threshold    
         self.W = self._compute_weights(grad_panc)
         self.p = p
         self.q = q
