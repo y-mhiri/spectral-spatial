@@ -1,48 +1,65 @@
-# Spectral-Spatial 
+# Minimal Hyperspectral Pansharpening Experiments
 
-This repository contains code for hyperspectral image denoising using TV based regularizers. Optimisation is performed using Chambolle-Pock algorithm [1]
+A streamlined codebase for hyperspectral image pansharpening experiments using TV-based regularization.
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
-    ```sh
-    git clone https://github.com/yourusername/spectral-spatial-analysis.git
-    cd spectral-spatial-analysis
-    ```
+```bash
+# Set your dataset path
+export DATASET_PATH="/path/to/your/dataset.zarr"
 
-2. Install the required dependencies:
-    ```sh
-    pip install -r requirements.txt
-    ```
+# Run convergence study (8 experiments)
+./scripts/study_convergence.sh
 
-## Usage
+# Run performance study (8 experiments)
+./scripts/study_performance.sh
 
-### Algorithms
+# Or run individual experiments
+python experiments/experiment_simple.py \
+  --algorithm CTV \
+  --dataset_path "$DATASET_PATH" \
+  --storage_path results/my_experiment
+```
 
-- `chambolle_pock.py`: Implementation of the Chambolle-Pock algorithm.
-- `grad_alignement.py`: Implementation of denoising using a gradient alignment regularization.
-- `nabla.py`: Contains functions for computing gradients.
-- `tvprior.py`: Implementation of denoising using a Total Variation Prior.
-- `tv_plus_grad_alignement.py`: Combines Total Variation and gradient alignment.
+## Structure
 
-### Datasets
+```
+src/
+├── algorithms/       # Core optimization algorithms
+├── datasets/         # Data loading and simulation
+└── metrics/          # Evaluation metrics
 
-- `datasets.py`: Functions for loading and processing datasets.
-- `show_dataset.ipynb`: Jupyter notebook for visualizing datasets.
+experiments/          # Experiment runners and configurations
+analysis/             # Visualization and result analysis
+```
 
-### Metrics
+## Key Features
 
-- `metrics.py`: Functions for computing various metrics.
+- **Two algorithms**: CTV and CTV with gradient alignment
+- **Simplified interface**: Sensible defaults, clear documentation
+- **Standardized visualization**: Publication-quality plots
+- **Minimal dependencies**: Only essential components
+- **Comprehensive scripts**: Ready-to-use experiment launchers
 
-### Scripts
+## Experiment Scripts
 
-- `ACP.ipynb`: Jupyter notebook for ACP analysis.
-- `benchmark.py`: Script for benchmarking algorithms.
-- `grad_alignement.ipynb`: Jupyter notebook for denoising using a gradient alignment regularization.
-- `HyDe.ipynb`: Jupyter notebook for HyDe analysis.
-- `tv_plus_grad_alignement.ipynb`: Jupyter notebook for TV + Gradient Alignment.
-- `tvprior.ipynb`: Jupyter notebook for denoising using a TV Prior.
+The `scripts/` directory contains pre-configured bash scripts for common experimental workflows:
 
-### Results
-- Contains results from various experiments and analyses.
+- **`study_convergence.sh`**: Tests algorithm convergence with different regularization weights
+- **`study_performance.sh`**: Compares performance under various degradation conditions
 
+Both scripts automatically:
+- Create timestamped result directories
+- Generate comprehensive visualizations
+- Save all metrics and figures
+- Provide progress updates
+
+See `scripts/README.md` for detailed usage.
+
+## Requirements
+
+See `requirements.txt` for dependencies.
+
+## Data
+
+Place your hyperspectral datasets in the `data/` directory. The code expects Zarr format with appropriate metadata.
