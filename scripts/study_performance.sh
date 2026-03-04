@@ -62,21 +62,23 @@ run_performance_test() {
 echo "Testing performance under different degradation conditions..."
 echo ""
 
-# Low noise, low blur (easy case)
-run_performance_test "CTV" 0.001 0.5
-run_performance_test "GradAlign" 0.001 0.5
-
-# Low noise, high blur
-run_performance_test "CTV" 0.001 2.0
-run_performance_test "GradAlign" 0.001 2.0
-
-# High noise, low blur
-run_performance_test "CTV" 0.05 0.5
-run_performance_test "GradAlign" 0.05 0.5
-
-# High noise, high blur (challenging case)
-run_performance_test "CTV" 0.05 2.0
-run_performance_test "GradAlign" 0.05 2.0
+# Test 3 noise levels as requested (35dB, 40dB, 45dB)
+# Note: noise_level in script corresponds to variance
+# 35dB ≈ 0.000316, 40dB ≈ 0.0001, 45dB ≈ 0.0000316
+for noise_db in 35 40 45; do
+    case $noise_db in
+        35) noise_var=0.000316 ;;
+        40) noise_var=0.0001 ;;
+        45) noise_var=0.0000316 ;;
+    esac
+    
+    # Test with low and high blur
+    for blur in 0.5 2.0; do
+        run_performance_test "CTV" $noise_var $blur
+        run_performance_test "GradAlign" $noise_var $blur
+    done
+done
+=======
 
 echo "Performance study completed!"
 echo ""

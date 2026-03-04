@@ -60,11 +60,13 @@ run_experiment() {
 }
 
 # Study convergence for different regularization weights
-for lambda in 0.001 0.01; do
-    for it in 5 10 100; do
+# Log scale from 1e-5 to 1e-2 as requested
+for lambda in 0.00001 0.0001 0.001 0.01; do
+    for it in 10 50 100; do
         run_experiment "CTV" "$lambda" "100" "$it"
         run_experiment "GradAlign" "$lambda" "100" "$it"
     done
+=======
 done
 
 echo "Convergence study completed!"

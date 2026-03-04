@@ -12,7 +12,6 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import zarr
-import numpy as np
 from typing import List, Dict, Optional, Union
 from pathlib import Path
 
@@ -355,85 +354,7 @@ def plot_reconstruction_example(
     print(f"Saved reconstruction example plot: {filename}")
 
 
-def save_experiment_summary(
-    results: Dict,
-    output_dir: str,
-    algorithm_name: str = "Algorithm"
-) -> None:
-    """
-    Save experiment summary as JSON and markdown.
-    
-    Args:
-        results: Dictionary containing experiment results
-        output_dir: Directory to save summary
-        algorithm_name: Name of algorithm
-    """
-    summary_dir = Path(output_dir)
-    summary_dir.mkdir(exist_ok=True)
-    
-    # Save JSON summary
-    json_file = summary_dir / "summary.json"
-    with open(json_file, 'w') as f:
-        json.dump(results, f, indent=2)
-    
-    # Save markdown summary
-    md_file = summary_dir / "summary.md"
-    with open(md_file, 'w') as f:
-        f.write(f"# {algorithm_name} Experiment Summary\n\n")
-        f.write(f"**Date**: {results.get('date', 'N/A')}\n\n")
-        
-        f.write("## Parameters\n")
-        for key, value in results.get('parameters', {}).items():
-            f.write(f"- **{key}**: {value}\n")
-        
-        f.write("\n## Metrics\n")
-        if 'metrics' in results:
-            for metric, values in results['metrics'].items():
-                if isinstance(values, list):
-                    mean_val = np.mean(values)
-                    std_val = np.std(values)
-                    f.write(f"- **{metric}**: {mean_val:.4f} ± {std_val:.4f}\n")
-                else:
-                    f.write(f"- **{metric}**: {values:.4f}\n")
-        
-        f.write("\n## Performance\n")
-        if 'performance' in results:
-            for key, value in results['performance'].items():
-                f.write(f"- **{key}**: {value:.2f}\n")
-    
-    print(f"Saved experiment summary: {json_file} and {md_file}")
 
-
-def load_results_from_zarr(zarr_path: str) -> Dict:
-    """
-    Load results from Zarr file for visualization.
-    
-    Args:
-        zarr_path: Path to results.zarr file
-        
-    Returns:
-        Dictionary containing loaded results
-    """
-    root = zarr.open(zarr_path, mode='r')
-    
-    results = {
-        'reconstructed': root['reconstructed'][:],
-        'loss': root['loss'][:],
-        'relval': root['relval'][:],
-        'algorithm': root.attrs.get('algorithm', 'unknown'),
-        'parameters': {k: v for k, v in root.attrs.items() if not k.startswith('_')}
-    }
-    
-    # Add metrics from attributes
-    metrics = {}
-    for key in root.attrs:
-        if key in ['PSNR', 'SSIM', 'SAM', 'RNMSE', 'CC']:
-            metrics[key] = root.attrs[key]
-    
-    if metrics:
-        results['metrics'] = metrics
-    
-    return results
 
 
 def visualize_experiment_results(

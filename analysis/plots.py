@@ -7,13 +7,120 @@ Provides basic plotting primitives for consistent visualization across the codeb
 
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 
 # Consistent styling
 plt.style.use('seaborn-v0_8-darkgrid')
 plt.rc('font', family='serif', size=12)
 plt.rc('axes', titlesize=14, labelsize=12)
 plt.rc('figure', titlesize=16)
+
+
+def plot_convergence_comparison(
+    loss_curves: List[np.ndarray],
+    param_values: List,
+    param_name: str,
+    output_dir: str,
+    title: str = "Convergence Comparison"
+) -> None:
+    """
+    Compare convergence curves across parameter values.
+    
+    Args:
+        loss_curves: List of loss arrays [n_curves, n_iterations]
+        param_values: Parameter values for each curve
+        param_name: Name of parameter being varied
+        output_dir: Directory to save plot
+        title: Plot title
+    """
+    plt.figure(figsize=(12, 8))
+    
+    for loss_curve, param_value in zip(loss_curves, param_values):
+        plt.semilogy(loss_curve, label=f"{param_name}={param_value}", linewidth=2)
+    
+    plt.xlabel('Iteration', fontsize=14)
+    plt.ylabel('Loss (log scale)', fontsize=14)
+    plt.title(title, fontsize=16, pad=20)
+    plt.legend(fontsize=10, framealpha=0.9)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    output_path = f"{output_dir}/convergence_{param_name}.png"
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Saved: {output_path}")
+
+
+def plot_parameter_impact(
+    param_values: List,
+    metric_values: List,
+    param_name: str,
+    metric_name: str,
+    output_dir: str,
+    title: str = "Parameter Impact"
+) -> None:
+    """
+    Plot metric vs parameter with error bars.
+    
+    Args:
+        param_values: Parameter values (x-axis)
+        metric_values: Metric values (y-axis)
+        param_name: Name of parameter
+        metric_name: Name of metric
+        output_dir: Directory to save plot
+        title: Plot title
+    """
+    plt.figure(figsize=(10, 6))
+    
+    # Simple line plot (error bars would need multiple runs)
+    plt.plot(param_values, metric_values, 'o-', linewidth=2, markersize=8)
+    
+    plt.xlabel(param_name, fontsize=14)
+    plt.ylabel(metric_name, fontsize=14)
+    plt.title(title, fontsize=16, pad=20)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    output_path = f"{output_dir}/impact_{param_name}_{metric_name}.png"
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Saved: {output_path}")
+
+
+def plot_algorithm_comparison(
+    algorithm_results: Dict[str, List[float]],
+    metric_name: str,
+    output_dir: str,
+    title: str = "Algorithm Comparison"
+) -> None:
+    """
+    Boxplot comparison of algorithms.
+    
+    Args:
+        algorithm_results: {algorithm_name: [metric_values]}
+        metric_name: Name of metric being compared
+        output_dir: Directory to save plot
+        title: Plot title
+    """
+    data = list(algorithm_results.values())
+    algorithms = list(algorithm_results.keys())
+    
+    plt.figure(figsize=(10, 6))
+    plt.boxplot(data, labels=algorithms, patch_artist=True,
+                boxprops=dict(facecolor='skyblue', alpha=0.7),
+                whiskerprops=dict(color='navy'),
+                capprops=dict(color='navy'),
+                medianprops=dict(color='red'))
+    
+    plt.ylabel(metric_name, fontsize=14)
+    plt.title(title, fontsize=16, pad=20)
+    plt.grid(True, alpha=0.3, axis='y')
+    plt.tight_layout()
+    
+    output_path = f"{output_dir}/comparison_{metric_name}.png"
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Saved: {output_path}")
 
 def plot_single_image(
     image: np.ndarray,

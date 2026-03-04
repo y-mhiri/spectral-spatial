@@ -12,6 +12,48 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
+def compare_experiment_results(results_list, metric='PSNR'):
+    """
+    Compare multiple experiment results for a given metric.
+    
+    Args:
+        results_list: List of experiment result dictionaries
+        metric: Metric to compare (e.g., 'PSNR', 'SSIM')
+        
+    Returns:
+        Dictionary with comparison statistics
+    """
+    if not results_list:
+        return {'error': 'No results provided'}
+    
+    # Extract metric values
+    values = []
+    parameters = []
+    
+    for result in results_list:
+        if metric in result.get('metrics', {}):
+            metric_values = result['metrics'][metric]
+            if isinstance(metric_values, list):
+                values.append(np.mean(metric_values))
+            else:
+                values.append(metric_values)
+            parameters.append(result.get('parameters', {}))
+    
+    if not values:
+        return {'error': f'Metric {metric} not found in results'}
+    
+    return {
+        'metric': metric,
+        'count': len(values),
+        'mean': float(np.mean(values)),
+        'std': float(np.std(values)),
+        'min': float(np.min(values)),
+        'max': float(np.max(values)),
+        'values': values,
+        'parameters': parameters
+    }
+
+
 def load_experiment_data(zarr_path: str) -> Dict:
     """
     Load complete experiment data from Zarr file.

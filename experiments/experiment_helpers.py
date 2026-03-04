@@ -22,6 +22,38 @@ def save_experiment_info(out_path, args, total_time, metrics, algorithm_name):
     with open(os.path.join(out_path, 'info.yaml'), 'w') as f:
         yaml.safe_dump(info, f)
 
+def compute_convergence_metrics(loss_array, tol=1e-8):
+    """
+    Compute convergence metrics from loss curve.
+    
+    Args:
+        loss_array: Array of loss values
+        tol: Convergence tolerance
+        
+    Returns:
+        Dictionary of convergence metrics
+    """
+    import numpy as np
+    
+    # Simple convergence detection: when loss changes less than tol for 5 consecutive iterations
+    converged = False
+    conv_iter = len(loss_array)
+    
+    for i in range(len(loss_array) - 5):
+        window = loss_array[i:i+5]
+        if np.max(window) - np.min(window) < tol:
+            converged = True
+            conv_iter = i + 5
+            break
+    
+    return {
+        'converged': converged,
+        'convergence_iteration': conv_iter,
+        'final_loss': float(loss_array[-1]),
+        'loss_reduction': float(loss_array[0] - loss_array[-1])
+    }
+
+
 def store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, total_time, algorithm_name):
     """Store all results in zarr format"""
     # Store attributes
@@ -41,11 +73,18 @@ def store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, tot
             # Store mean value for scalar metrics
             if len(metric_values) > 0:
                 mean_value = sum(metric_values) / len(metric_values)
+                std_value = (sum((x - mean_value) ** 2 for x in metric_values) / len(metric_values)) ** 0.5
                 root.attrs[f'{metric}_mean'] = float(mean_value)
+                root.attrs[f'{metric}_std'] = float(std_value)  # Added: standard deviation
                 root.attrs[f'{metric}_count'] = len(metric_values)
         else:
             # Store scalar value directly
             root.attrs[metric] = metric_values
+    
+    # Store convergence metrics - Added
+    convergence_metrics = compute_convergence_metrics(loss_ar.cpu().numpy())
+    for metric, value in convergence_metrics.items():
+        root.attrs[f'convergence_{metric}'] = value
     
     # Store arrays
     root.create_dataset('reconstructed', data=reconstructed_ar.cpu().numpy(), shape=reconstructed_ar.shape)
