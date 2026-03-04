@@ -57,7 +57,7 @@ def plot_convergence(
     if isinstance(loss_data, list):
         loss_arrays = loss_data
     else:
-        loss_arrays = [loss_data]
+        loss_arrays = list(loss_data)
     
     markers = ['o', 's', 'D', '^', 'v', 'p', '*']
     colors = plt.cm.tab10.colors
