@@ -81,7 +81,14 @@ def plot_noisy_inputs_comparison(
     
     for img in all_images:
         if rgb_indices is not None:
-            img_rgb = img[rgb_indices]
+            # Safe RGB band selection with bounds checking
+            n_bands = img.shape[0]
+            if n_bands == 1:
+                img_rgb = img[0]  # Single band (panchromatic)
+            else:
+                # Use valid indices, clamp to available bands
+                valid_indices = [min(idx, n_bands-1) for idx in rgb_indices[:min(3, n_bands)]]
+                img_rgb = img[valid_indices]
         else:
             img_rgb = img[:3] if img.shape[0] >= 3 else img
         all_values.extend([img_rgb.min(), img_rgb.max()])
