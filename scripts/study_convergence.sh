@@ -49,7 +49,8 @@ run_experiment() {
         python analysis/visualization.py \
             --zarr_path "$output_dir/results.zarr" \
             --output_dir "$output_dir/visualization" \
-            --rgb_indices 20 10 5
+            --rgb_indices 20 10 5 \
+            --dataset_path "$DATASET_PATH"
         
         echo "✓ Visualization for $algorithm with λ=$lmbda completed"
     else

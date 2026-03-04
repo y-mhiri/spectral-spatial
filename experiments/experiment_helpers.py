@@ -28,11 +28,24 @@ def store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, tot
     root.attrs['algorithm'] = algorithm_name
     root.attrs['total_time'] = total_time
     for key, value in vars(args).items():
-        root.attrs[key] = value
+        # Convert non-scalar values to strings for Zarr attributes
+        if hasattr(value, '__len__') and not isinstance(value, str):
+            root.attrs[key] = str(value)
+        else:
+            root.attrs[key] = value
     
-    # Store metrics
+    # Store metrics - convert lists to mean values since Zarr attributes can't store lists
     for metric in metrics:
-        root.attrs[metric] = metrics[metric]
+        metric_values = metrics[metric]
+        if isinstance(metric_values, list):
+            # Store mean value for scalar metrics
+            if len(metric_values) > 0:
+                mean_value = sum(metric_values) / len(metric_values)
+                root.attrs[f'{metric}_mean'] = float(mean_value)
+                root.attrs[f'{metric}_count'] = len(metric_values)
+        else:
+            # Store scalar value directly
+            root.attrs[metric] = metric_values
     
     # Store arrays
     root.create_dataset('reconstructed', data=reconstructed_ar.cpu().numpy(), shape=reconstructed_ar.shape)
