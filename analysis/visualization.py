@@ -15,6 +15,11 @@ import numpy as np
 from typing import List, Dict, Optional, Union
 from pathlib import Path
 
+# Import our new modules
+from analysis.plots import plot_single_image, plot_rgb_comparison, plot_convergence_curve, plot_error_map
+from analysis.data_io import load_experiment_data, get_experiment_parameters, get_metrics_from_data, query_image_data
+from analysis.report import generate_experiment_summary, create_visualization_index
+
 # Set consistent styling
 plt.style.use('seaborn-v0_8-darkgrid')
 plt.rc('font', family='serif', size=12)
@@ -28,6 +33,105 @@ def setup_plot_directory(output_dir: str) -> Path:
     plot_dir = Path(output_dir) / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
     return plot_dir
+
+
+def plot_noisy_inputs_comparison(
+    original: np.ndarray,
+    low_res_hsi: np.ndarray,
+    panchromatic: np.ndarray,
+    output_dir: str,
+    title: str = "Noisy Inputs Comparison",
+    rgb_indices: Optional[List[int]] = None
+) -> None:
+    """
+    Plot comparison of original vs noisy input images.
+    
+    Args:
+        original: Original high-resolution hyperspectral image
+        low_res_hsi: Simulated low-resolution hyperspectral image
+        panchromatic: Simulated panchromatic image
+        output_dir: Directory to save plots
+        title: Plot title
+        rgb_indices: Indices for RGB visualization
+    """
+    plot_dir = setup_plot_directory(output_dir)
+    
+    # Create figure with 4 columns: Original, Low-res HSI, Panchromatic, Error
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+    
+    # Normalize function for consistent scaling
+    def normalize_image(img, rgb_idx):
+        if rgb_idx is not None:
+            img_rgb = img[rgb_idx]
+        else:
+            img_rgb = img[:3] if img.shape[0] >= 3 else img
+        img_min = img_rgb.min()
+        img_max = img_rgb.max()
+        return (img_rgb - img_min) / (img_max - img_min + 1e-8)
+    
+    # Find global min/max for consistent scaling
+    all_images = [original, low_res_hsi, panchromatic]
+    all_values = []
+    
+    for img in all_images:
+        if rgb_indices is not None:
+            img_rgb = img[rgb_indices]
+        else:
+            img_rgb = img[:3] if img.shape[0] >= 3 else img
+        all_values.extend([img_rgb.min(), img_rgb.max()])
+    
+    global_min = min(all_values)
+    global_max = max(all_values)
+    
+    # Plot original
+    orig_rgb = original[rgb_indices] if rgb_indices is not None else original[:3]
+    orig_normalized = (orig_rgb - global_min) / (global_max - global_min + 1e-8)
+    
+    if orig_normalized.ndim == 3:
+        axes[0].imshow(np.transpose(orig_normalized, (1, 2, 0)))
+    else:
+        axes[0].imshow(orig_normalized, cmap='viridis')
+    axes[0].set_title('Original HR HSI')
+    axes[0].axis('off')
+    
+    # Plot low-res HSI
+    lr_rgb = low_res_hsi[rgb_indices] if rgb_indices is not None else low_res_hsi[:3]
+    lr_normalized = (lr_rgb - global_min) / (global_max - global_min + 1e-8)
+    
+    if lr_normalized.ndim == 3:
+        axes[1].imshow(np.transpose(lr_normalized, (1, 2, 0)))
+    else:
+        axes[1].imshow(lr_normalized, cmap='viridis')
+    axes[1].set_title('Simulated LR HSI (Noisy)')
+    axes[1].axis('off')
+    
+    # Plot panchromatic
+    pan_rgb = panchromatic[rgb_indices] if rgb_indices is not None else panchromatic[:3]
+    pan_normalized = (pan_rgb - global_min) / (global_max - global_min + 1e-8)
+    
+    if pan_normalized.ndim == 3:
+        axes[2].imshow(np.transpose(pan_normalized, (1, 2, 0)))
+    else:
+        axes[2].imshow(pan_normalized, cmap='viridis')
+    axes[2].set_title('Simulated Panchromatic (Noisy)')
+    axes[2].axis('off')
+    
+    # Plot error map (difference between original and low-res HSI)
+    error = np.abs(orig_rgb - lr_rgb).mean(axis=0)
+    error_img = axes[3].imshow(error, cmap='viridis')
+    axes[3].set_title('Error: Original vs LR HSI')
+    axes[3].axis('off')
+    plt.colorbar(error_img, ax=axes[3], fraction=0.046, pad=0.04)
+    
+    plt.suptitle(title, y=1.02)
+    plt.tight_layout()
+    
+    # Save plot
+    filename = plot_dir / "noisy_inputs_comparison.png"
+    plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+    
+    print(f"Saved noisy inputs comparison plot: {filename}")
 
 
 def plot_convergence(
@@ -319,7 +423,8 @@ def load_results_from_zarr(zarr_path: str) -> Dict:
 def visualize_experiment_results(
     zarr_path: str,
     output_dir: str,
-    rgb_indices: Optional[List[int]] = None
+    rgb_indices: Optional[List[int]] = None,
+    dataset_path: Optional[str] = None
 ) -> None:
     """
     Complete visualization pipeline for experiment results.
@@ -328,9 +433,10 @@ def visualize_experiment_results(
         zarr_path: Path to results.zarr file
         output_dir: Directory to save visualizations
         rgb_indices: Indices for RGB visualization
+        dataset_path: Optional path to original dataset for noisy inputs visualization
     """
-    # Load results
-    results = load_results_from_zarr(zarr_path)
+    # Load results using new data IO
+    results = load_experiment_data(zarr_path)
     
     # Create output directory
     output_dir = Path(output_dir)
@@ -345,18 +451,21 @@ def visualize_experiment_results(
         )
     
     # Plot metrics if available
-    if 'metrics' in results:
+    metrics = get_metrics_from_data(results)
+    if metrics:
         plot_metrics_comparison(
-            results['metrics'],
+            metrics,
             output_dir,
             algorithm_names=[results.get('algorithm', 'Algorithm')]
         )
     
     # Plot reconstruction example (first image)
     if 'reconstructed' in results and len(results['reconstructed']) > 0:
-        # Create synthetic original for demo (in practice, load from dataset)
-        original = results['reconstructed'][0]  # Placeholder
-        reconstructed = results['reconstructed'][0]
+        image_data = query_image_data(results, image_index=0)
+        
+        # For demo, use reconstructed as "original" (in practice, load real original)
+        original = image_data['reconstructed']
+        reconstructed = image_data['reconstructed']
         
         plot_reconstruction_example(
             original,
@@ -366,11 +475,60 @@ def visualize_experiment_results(
             rgb_indices=rgb_indices
         )
     
-    # Save summary
-    save_experiment_summary(
+    # Plot noisy inputs if dataset path is provided
+    if dataset_path is not None:
+        try:
+            # Load dataset to simulate noisy inputs
+            from src.datasets.pandataset import PANDataset
+            import torch
+            
+            # Create minimal dataset just for simulation
+            dataset = PANDataset(
+                root_dir=dataset_path,
+                split='train',
+                normalize=True,
+                scale=results.get('scale', 4),
+                sigma_blur=results.get('sigma_blur', 1.0),
+                noise_level=results.get('noise_level', 0.01),
+                device='cpu',
+                seed=42
+            )
+            
+            # Get first image and simulate noisy inputs
+            X = dataset[0].unsqueeze(0)
+            Y_H = dataset.simulate_low_res_hsi(X, noise=True)
+            Y_M = dataset.simulate_panchromatic(X, noise=True)
+            
+            # Convert to numpy for visualization
+            original_np = X.squeeze(0).cpu().numpy()
+            low_res_np = Y_H.squeeze(0).cpu().numpy()
+            pan_np = Y_M.squeeze(0).cpu().numpy()
+            
+            plot_noisy_inputs_comparison(
+                original_np,
+                low_res_np,
+                pan_np,
+                output_dir,
+                title="Noisy Inputs Visualization",
+                rgb_indices=rgb_indices
+            )
+            
+        except Exception as e:
+            print(f"Could not generate noisy inputs visualization: {e}")
+    
+    # Generate comprehensive reports
+    generate_experiment_summary(
         results,
         output_dir,
         algorithm_name=results.get('algorithm', 'Algorithm')
+    )
+    
+    # Create HTML index
+    image_count = len(results.get('reconstructed', [0]))
+    create_visualization_index(
+        output_dir,
+        algorithm_name=results.get('algorithm', 'Algorithm'),
+        image_count=image_count
     )
     
     print(f"Visualization complete! Results saved to: {output_dir}")
@@ -389,11 +547,14 @@ if __name__ == "__main__":
                        help="Directory to save visualizations")
     parser.add_argument("--rgb_indices", type=int, nargs='+', default=None,
                        help="RGB band indices for visualization")
+    parser.add_argument("--dataset_path", type=str, default=None,
+                       help="Path to original dataset for noisy inputs visualization")
     
     args = parser.parse_args()
     
     visualize_experiment_results(
         args.zarr_path,
         args.output_dir,
-        args.rgb_indices
+        args.rgb_indices,
+        args.dataset_path
     )
