@@ -111,8 +111,11 @@ def plot_noisy_inputs_comparison(
     axes[1].set_title('Simulated LR HSI (Noisy)')
     axes[1].axis('off')
     
-    # Plot panchromatic
-    pan_rgb = panchromatic[rgb_indices] if rgb_indices is not None else panchromatic[:3]
+    # Plot panchromatic (special handling for typically single-band image)
+    if panchromatic.shape[0] == 1:
+        pan_rgb = panchromatic[0]  # Single band for grayscale display
+    else:
+        pan_rgb = panchromatic[rgb_indices] if rgb_indices is not None else panchromatic[:3]
     pan_normalized = (pan_rgb - global_min) / (global_max - global_min + 1e-8)
     
     if pan_normalized.ndim == 3:
