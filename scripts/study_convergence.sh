@@ -66,6 +66,7 @@ for lambda in 0.00001 0.0001 0.001 0.01; do
         run_experiment "CTV" "$lambda" "100" "$it"
         run_experiment "GradAlign" "$lambda" "100" "$it"
     done
+done
 
 echo "Convergence study completed!"
 echo ""
@@ -75,11 +76,4 @@ echo "To generate comprehensive analysis figures, run:"
 echo "  python analysis/pipelines/convergence_analysis.py \\"
 echo "    --study_dir $RESULTS_DIR \\"
 echo "    --output_dir $RESULTS_DIR/analysis"
-echo ""
-=======
-done
-
-echo "Convergence study completed!"
-echo ""
-echo "Results location: $RESULTS_DIR"
 echo ""

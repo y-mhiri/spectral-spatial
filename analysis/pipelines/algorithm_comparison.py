@@ -7,11 +7,12 @@ Answers: "How do CTV and GradAlign compare under different conditions?"
 import os
 import json
 import numpy as np
-from glob import glob
+import matplotlib.pyplot as plt
 from typing import Dict, List, Any
 
 from analysis.data_io import load_experiment_data, compare_experiment_results
 from analysis.plots import plot_algorithm_comparison, plot_parameter_impact
+from analysis.pipeline_utils import load_study_results, extract_metric
 
 
 def algorithm_comparison_pipeline(study_dirs: Dict[str, str], output_dir: str) -> Dict[str, Any]:
@@ -37,20 +38,11 @@ def algorithm_comparison_pipeline(study_dirs: Dict[str, str], output_dir: str) -
     
     for algorithm, study_dir in study_dirs.items():
         print(f"\n{algorithm}:")
-        zarr_files = sorted(glob(f"{study_dir}/run_*/results.zarr"))
-        
-        if not zarr_files:
-            print(f"  ✗ No results found in {study_dir}")
-            continue
-        
-        results = []
-        for zarr_file in zarr_files:
-            try:
-                data = load_experiment_data(zarr_file)
-                results.append(data)
-                print(f"  ✓ Loaded: {os.path.basename(zarr_file)}")
-            except Exception as e:
-                print(f"  ✗ Failed: {zarr_file} - {e}")
+        try:
+            results = load_study_results(study_dir)
+        except ValueError as e:
+            print(f"  ✗ {e}")
+            results = []
         
         if results:
             algorithm_results[algorithm] = results
@@ -73,11 +65,7 @@ def algorithm_comparison_pipeline(study_dirs: Dict[str, str], output_dir: str) -
         for algorithm, results in algorithm_results.items():
             values = []
             for result in results:
-                metric_val = result.get('metrics', {}).get(metric, [0])
-                if isinstance(metric_val, list) and len(metric_val) > 0:
-                    values.append(metric_val[0])
-                elif not isinstance(metric_val, list):
-                    values.append(metric_val)
+                values.append(extract_metric(result, metric))
             
             if values:
                 algorithm_metric_values[algorithm] = values

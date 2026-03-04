@@ -288,29 +288,3 @@ def plot_error_map(
     
     return im
 
-def plot_spectral_signature(
-    image: np.ndarray,
-    ax,
-    title: str = "Spectral Signature",
-    x_label: str = "Band Index",
-    y_label: str = "Intensity"
-) -> None:
-    """
-    Plot spectral signature (mean across spatial dimensions).
-    
-    Args:
-        image: Hyperspectral image [C, H, W]
-        ax: Matplotlib axes
-        title: Plot title
-        x_label: X-axis label
-        y_label: Y-axis label
-    """
-    # Compute mean spectrum
-    spectrum = image.mean(axis=(1, 2))  # Mean over H, W
-    
-    # Plot
-    ax.plot(spectrum, linewidth=2)
-    ax.set_title(title)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-    ax.grid(True, alpha=0.3)

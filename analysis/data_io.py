@@ -80,28 +80,6 @@ def load_experiment_data(zarr_path: str) -> Dict:
     return data
 
 
-def load_noisy_inputs(dataset_path: str, indices: List[int] = None) -> Dict:
-    """
-    Load noisy input images from dataset for visualization.
-    
-    Args:
-        dataset_path: Path to dataset Zarr file
-        indices: List of image indices to load (None for all)
-        
-    Returns:
-        Dictionary with noisy inputs for each image
-    """
-    # This is a placeholder - in practice, we would need to re-run the simulation
-    # or store the noisy inputs during the experiment
-    
-    # For now, return empty structure
-    return {
-        'low_res_hsi': [],
-        'panchromatic': [],
-        'original': []
-    }
-
-
 def get_experiment_parameters(data: Dict) -> Dict:
     """
     Extract experiment parameters from loaded data.
@@ -201,27 +179,3 @@ def load_dataset_metadata(dataset_path: str) -> Dict:
     return metadata
 
 
-def save_visualization_data(
-    data: Dict,
-    output_dir: str,
-    prefix: str = "vis"
-) -> Path:
-    """
-    Save visualization data to numpy files for later use.
-    
-    Args:
-        data: Data to save
-        output_dir: Output directory
-        prefix: File prefix
-        
-    Returns:
-        Path to saved file
-    """
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Save as numpy file
-    output_path = output_dir / f"{prefix}_data.npz"
-    np.savez(output_path, **data)
-    
-    return output_path

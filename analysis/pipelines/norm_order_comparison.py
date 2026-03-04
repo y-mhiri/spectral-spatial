@@ -7,11 +7,11 @@ Answers: "How do different norm orders (p, q, r) affect algorithm performance?"
 import os
 import json
 import numpy as np
-from glob import glob
 from typing import Dict, List, Any
 
 from analysis.data_io import load_experiment_data
 from analysis.plots import plot_parameter_impact
+from analysis.pipeline_utils import load_study_results, extract_metric
 
 
 def norm_order_comparison_pipeline(study_dir: str, output_dir: str) -> Dict[str, Any]:
@@ -34,22 +34,7 @@ def norm_order_comparison_pipeline(study_dir: str, output_dir: str) -> Dict[str,
     
     # Load all experiment results
     print("\nLoading experiment results...")
-    zarr_files = sorted(glob(f"{study_dir}/run_*/results.zarr"))
-    
-    if not zarr_files:
-        raise ValueError(f"No results found in {study_dir}")
-    
-    results = []
-    for zarr_file in zarr_files:
-        try:
-            data = load_experiment_data(zarr_file)
-            results.append(data)
-            print(f"  ✓ Loaded: {os.path.basename(zarr_file)}")
-        except Exception as e:
-            print(f"  ✗ Failed: {zarr_file} - {e}")
-    
-    if not results:
-        raise ValueError("No valid results loaded")
+    results = load_study_results(study_dir)
     
     # Extract norm orders and metrics
     print("\nExtracting data...")
@@ -71,10 +56,10 @@ def norm_order_comparison_pipeline(study_dir: str, output_dir: str) -> Dict[str,
             }
         
         # Extract metrics
-        psnr = result.get('metrics', {}).get('PSNR', [0])[0] if isinstance(result.get('metrics', {}).get('PSNR', [0]), list) else result.get('metrics', {}).get('PSNR', 0)
-        ssim = result.get('metrics', {}).get('SSIM', [0])[0] if isinstance(result.get('metrics', {}).get('SSIM', [0]), list) else result.get('metrics', {}).get('SSIM', 0)
-        rmse = result.get('metrics', {}).get('RNMSE', [0])[0] if isinstance(result.get('metrics', {}).get('RNMSE', [0]), list) else result.get('metrics', {}).get('RNMSE', 0)
-        sam = result.get('metrics', {}).get('SAM', [0])[0] if isinstance(result.get('metrics', {}).get('SAM', [0]), list) else result.get('metrics', {}).get('SAM', 0)
+        psnr = extract_metric(result, 'PSNR')
+        ssim = extract_metric(result, 'SSIM')
+        rmse = extract_metric(result, 'RNMSE')
+        sam = extract_metric(result, 'SAM')
         
         norm_groups[norm_key]['metrics'].append({
             'PSNR': psnr,

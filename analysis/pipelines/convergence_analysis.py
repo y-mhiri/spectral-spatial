@@ -7,11 +7,12 @@ Answers: "Depending on Chambolle-Pock iterations and regularization, does the al
 import os
 import json
 import numpy as np
-from glob import glob
+import matplotlib.pyplot as plt
 from typing import Dict, List, Any
 
 from analysis.data_io import load_experiment_data
 from analysis.plots import plot_convergence_comparison, plot_parameter_impact
+from analysis.pipeline_utils import load_study_results, extract_metric
 
 
 def convergence_analysis_pipeline(study_dir: str, output_dir: str) -> Dict[str, Any]:
@@ -34,22 +35,7 @@ def convergence_analysis_pipeline(study_dir: str, output_dir: str) -> Dict[str, 
     
     # Load all experiment results
     print("\nLoading experiment results...")
-    zarr_files = sorted(glob(f"{study_dir}/run_*/results.zarr"))
-    
-    if not zarr_files:
-        raise ValueError(f"No results found in {study_dir}")
-    
-    results = []
-    for zarr_file in zarr_files:
-        try:
-            data = load_experiment_data(zarr_file)
-            results.append(data)
-            print(f"  ✓ Loaded: {os.path.basename(zarr_file)}")
-        except Exception as e:
-            print(f"  ✗ Failed: {zarr_file} - {e}")
-    
-    if not results:
-        raise ValueError("No valid results loaded")
+    results = load_study_results(study_dir)
     
     # Extract parameters and metrics
     print("\nExtracting data...")
@@ -79,8 +65,8 @@ def convergence_analysis_pipeline(study_dir: str, output_dir: str) -> Dict[str, 
             'final_loss': result.get('convergence_final_loss', 0)
         })
         param_groups[key]['metrics'].append({
-            'PSNR': result.get('metrics', {}).get('PSNR', [0])[0] if isinstance(result.get('metrics', {}).get('PSNR', [0]), list) else result.get('metrics', {}).get('PSNR', 0),
-            'SSIM': result.get('metrics', {}).get('SSIM', [0])[0] if isinstance(result.get('metrics', {}).get('SSIM', [0]), list) else result.get('metrics', {}).get('SSIM', 0)
+            'PSNR': extract_metric(result, 'PSNR'),
+            'SSIM': extract_metric(result, 'SSIM'),
         })
     
     # Generate figures
@@ -173,8 +159,8 @@ def convergence_analysis_pipeline(study_dir: str, output_dir: str) -> Dict[str, 
             'total_runs': len(results),
             'convergence_rate': np.mean([r.get('convergence_converged', False) for r in results]),
             'avg_final_loss': np.mean([r.get('convergence_final_loss', 0) for r in results]),
-            'avg_psnr': np.mean([(r.get('metrics', {}).get('PSNR', [0])[0] if isinstance(r.get('metrics', {}).get('PSNR', [0]), list) else r.get('metrics', {}).get('PSNR', 0)) for r in results]),
-            'avg_ssim': np.mean([(r.get('metrics', {}).get('SSIM', [0])[0] if isinstance(r.get('metrics', {}).get('SSIM', [0]), list) else r.get('metrics', {}).get('SSIM', 0)) for r in results])
+            'avg_psnr': np.mean([extract_metric(r, 'PSNR') for r in results]),
+            'avg_ssim': np.mean([extract_metric(r, 'SSIM') for r in results])
         }
     }
     

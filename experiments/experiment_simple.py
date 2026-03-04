@@ -24,47 +24,6 @@ from src.metrics.metrics import compute_metrics
 from experiments.experiment_helpers import save_experiment_info, store_results, print_experiment_info
 
 
-def get_default_params(algorithm_name):
-    """Return sensible defaults for each algorithm."""
-    defaults = {
-        # Common parameters
-        'device': 'cpu',
-        'dtype': 'float32',
-        'seed': 42,
-        'max_iter': 50,
-        'tol': 1e-8,
-        'scale': 4,
-        'noise_level': 0.01,  # -20dB
-        'sigma_blur': 1.0,
-        
-        # Algorithm-specific parameters
-        'CTV': {
-            'lmbda': 0.1,      # Regularization weight
-            'lmbda_m': 1.0,    # Panchromatic weight
-            'p': 2.0,          # CTV norm parameters
-            'q': 2.0,
-            'r': 1.0,
-            'max_iter_cp': 50,
-            'sigma_cp': 2.0,
-            'theta_cp': 1.0
-        },
-        'GradAlign': {
-            'lmbda': 0.1,
-            'lmbda_m': 1.0,
-            'p': 2.0,
-            'q': 2.0,
-            'r': 1.0,
-            'max_iter_cp': 50,
-            'sigma_cp': 2.0,
-            'theta_cp': 1.0,
-            'threshold_softness': 1e-5,
-            'threshold': None  # Auto-computed if None
-        }
-    }
-    
-    return {**defaults['Common'], **defaults.get(algorithm_name, {})}
-
-
 def setup_experiment(args):
     """Setup experiment environment and parameters."""
     # Set up device and data type

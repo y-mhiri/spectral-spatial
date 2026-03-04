@@ -114,8 +114,10 @@ def generate_markdown_report(results: Dict, algorithm_name: str) -> str:
     
     # Header
     report.append(f"# {algorithm_name} Experiment Report")
+    total_time = results.get('total_time', 'N/A')
+    time_str = f"{total_time:.2f}" if isinstance(total_time, (int, float)) else str(total_time)
     report.append(f"\n**Date**: {results.get('date', 'N/A')}")
-    report.append(f"\n**Total Time**: {results.get('total_time', 'N/A'):.2f} seconds")
+    report.append(f"\n**Total Time**: {time_str} seconds")
     
     # Parameters
     report.append("\n## Parameters")
@@ -156,9 +158,11 @@ def generate_text_summary(results: Dict, algorithm_name: str) -> str:
     """
     lines = []
     
+    total_time = results.get('total_time', 'N/A')
+    time_str = f"{total_time:.2f}" if isinstance(total_time, (int, float)) else str(total_time)
     lines.append(f"Algorithm: {algorithm_name}")
     lines.append(f"Date: {results.get('date', 'N/A')}")
-    lines.append(f"Total Time: {results.get('total_time', 'N/A'):.2f} seconds")
+    lines.append(f"Total Time: {time_str} seconds")
     
     # Key metrics
     if 'metrics' in results:

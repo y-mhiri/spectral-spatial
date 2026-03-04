@@ -399,18 +399,28 @@ def visualize_experiment_results(
     # Plot reconstruction example (first image)
     if 'reconstructed' in results and len(results['reconstructed']) > 0:
         image_data = query_image_data(results, image_index=0)
-        
-        # For demo, use reconstructed as "original" (in practice, load real original)
-        original = image_data['reconstructed']
         reconstructed = image_data['reconstructed']
-        
-        plot_reconstruction_example(
-            original,
-            reconstructed,
-            output_dir,
-            title=f"{results.get('algorithm', 'Algorithm')} Reconstruction",
-            rgb_indices=rgb_indices
-        )
+
+        # Load ground truth from dataset if provided
+        original = None
+        if dataset_path is not None:
+            try:
+                ds_root = zarr.open(dataset_path, mode='r')
+                orig_np = ds_root['train/0'][:]  # (H, W, C)
+                original = np.transpose(orig_np, (2, 0, 1))  # -> (C, H, W)
+            except Exception as e:
+                print(f"Could not load ground truth for reconstruction comparison: {e}")
+
+        if original is not None:
+            plot_reconstruction_example(
+                original,
+                reconstructed,
+                output_dir,
+                title=f"{results.get('algorithm', 'Algorithm')} Reconstruction",
+                rgb_indices=rgb_indices
+            )
+        else:
+            print("Skipping reconstruction comparison: ground truth not available (provide --dataset_path)")
     
     # Plot noisy inputs if dataset path is provided
     if dataset_path is not None:

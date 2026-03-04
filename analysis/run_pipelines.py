@@ -157,12 +157,11 @@ def run_all_pipelines(
         os.path.join(master_output_dir, "noise_impact")
     )
     
-    # Norm order comparison removed for simplicity
-    # if os.path.exists(norm_study_dir):
-    #     run_norm_order_comparison(
-    #         norm_study_dir,
-    #         os.path.join(master_output_dir, "norm_order_comparison")
-    #     )
+    if norm_study_dir and os.path.exists(norm_study_dir):
+        run_norm_order_comparison(
+            norm_study_dir,
+            os.path.join(master_output_dir, "norm_order_comparison")
+        )
     else:
         print("Norm order study directory not found. Skipping norm order comparison.")
     
@@ -242,11 +241,13 @@ if __name__ == "__main__":
                        help="Directory with CTV algorithm results")
     parser.add_argument("--gradalign_study", type=str, required=True,
                        help="Directory with GradAlign algorithm results")
+    parser.add_argument("--norm_study", type=str, default="",
+                       help="Directory with norm order study results (optional)")
     parser.add_argument("--output", type=str, default="results/analysis",
                        help="Base output directory")
-    
+
     args = parser.parse_args()
-    
+
     run_all_pipelines(
         args.convergence_study,
         args.noise_study,

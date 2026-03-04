@@ -78,7 +78,6 @@ for noise_db in 35 40 45; do
         run_performance_test "GradAlign" $noise_var $blur
     done
 done
-=======
 
 echo "Performance study completed!"
 echo ""
