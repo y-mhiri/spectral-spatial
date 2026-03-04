@@ -193,6 +193,7 @@ def main():
                        choices=["cpu", "cuda"], help="Device to use")
     parser.add_argument("--dtype", type=str, default="float32",
                        choices=["float32", "float64"], help="Data type")
+    parser.add_argument("--seed",type=int, default=42, help="Seed for random number generation.")
     
     # Dataset parameters
     parser.add_argument("--scale", type=int, default=4,
