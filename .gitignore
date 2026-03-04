@@ -15,6 +15,7 @@ results/
 output/
 
 # Environment
+data_config/
 venv/
 .env
 
