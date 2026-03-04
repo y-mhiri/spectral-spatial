@@ -233,138 +233,16 @@ def main():
     parser.add_argument("--threshold", type=float, default=None,
                        help="GradAlign threshold (auto if None)")
     
-    # Add sweep arguments
-    parser.add_argument("--sweep", action="store_true",
-                       help="Enable parameter sweep mode")
-    parser.add_argument("--lmbda_sweep", type=float, nargs='+',
-                       help="Lambda values to sweep")
-    parser.add_argument("--max_iter_cp_sweep", type=int, nargs='+',
-                       help="Chambolle-Pock max iterations to sweep")
-    parser.add_argument("--noise_level_sweep", type=float, nargs='+',
-                       help="Noise levels to sweep")
-    parser.add_argument("--sigma_blur_sweep", type=float, nargs='+',
-                       help="Blur sigma values to sweep")
-
     args = parser.parse_args()
     
-    # Check if sweep mode is requested
-    if hasattr(args, 'sweep') and args.sweep:
-        # Parse sweep parameters
-        sweep_params = {}
-        for param in ['lmbda', 'max_iter_cp', 'noise_level', 'sigma_blur']:
-            if hasattr(args, f'{param}_sweep'):
-                values = getattr(args, f'{param}_sweep')
-                if values:
-                    sweep_params[param] = values
-        
-        if sweep_params:
-            print(f"Running parameter sweep with: {sweep_params}")
-            results = run_parameter_sweep(args, sweep_params, args.storage_path)
-            
-            # Save sweep summary
-            import json
-            summary_file = os.path.join(args.storage_path, "sweep_summary.json")
-            with open(summary_file, 'w') as f:
-                json.dump(results, f, indent=2)
-            print(f"Sweep summary saved to: {summary_file}")
-        else:
-            print("No sweep parameters specified. Running single experiment.")
-            run_experiment(args)
-    else:
-        # Print experiment info
-        print_experiment_info(args, args.algorithm)
-        
-        # Run experiment
-        run_experiment(args)
+    # Print experiment info
+    print_experiment_info(args, args.algorithm)
+    
+    # Run experiment
+    run_experiment(args)
 
 
 if __name__ == "__main__":
     main()
 
 
-def run_parameter_sweep(base_args, param_sweep, output_dir):
-    """
-    Run multiple experiments with parameter variations.
-    
-    Args:
-        base_args: Base arguments (parsed args object)
-        param_sweep: Dict of {param_name: [values]} to sweep
-        output_dir: Base output directory for sweep results
-    
-    Returns:
-        List of results summaries
-    """
-    import time
-    import os
-    from itertools import product
-    
-    # Convert args to dict for manipulation
-    base_params = vars(base_args)
-    
-    # Generate all parameter combinations
-    param_names = list(param_sweep.keys())
-    param_values = list(param_sweep.values())
-    combinations = list(product(*param_values))
-    
-    results = []
-    
-    print(f"Starting parameter sweep: {len(combinations)} combinations")
-    print(f"Parameters: {param_names}")
-    print(f"Values: {param_values}")
-    print("-" * 50)
-    
-    for i, combo in enumerate(combinations):
-        # Create parameter dict for this combination
-        params = base_params.copy()
-        for name, value in zip(param_names, combo):
-            params[name] = value
-        
-        # Create unique output directory
-        combo_str = "_".join([f"{name}{value}" for name, value in zip(param_names, combo)])
-        run_output_dir = os.path.join(output_dir, f"run_{i:03d}_{combo_str}")
-        os.makedirs(run_output_dir, exist_ok=True)
-        
-        # Update args object
-        for key, value in params.items():
-            setattr(base_args, key, value)
-        base_args.storage_path = run_output_dir
-        
-        print(f"Run {i+1}/{len(combinations)}: {combo_str}")
-        
-        # Run experiment
-        start_time = time.time()
-        run_experiment(base_args)
-        compute_time = time.time() - start_time
-        
-        # Load and store results summary
-        try:
-            from analysis.data_io import load_experiment_data
-            from analysis.report import generate_text_summary
-            
-            zarr_path = os.path.join(run_output_dir, "results.zarr")
-            if os.path.exists(zarr_path):
-                data = load_experiment_data(zarr_path)
-                summary = generate_text_summary(data, base_args.algorithm)
-                results.append({
-                    'parameters': params,
-                    'summary': summary,
-                    'time': compute_time,
-                    'output_dir': run_output_dir
-                })
-        except Exception as e:
-            print(f"Warning: Could not load results for {combo_str}: {e}")
-            results.append({
-                'parameters': params,
-                'summary': f"Error: {e}",
-                'time': compute_time,
-                'output_dir': run_output_dir
-            })
-        
-        print(f"Completed {i+1}/{len(combinations)}")
-        print("-" * 30)
-    
-    print("Parameter sweep completed!")
-    print(f"Total time: {sum(r['time'] for r in results):.1f} seconds")
-    print(f"Results saved to: {output_dir}")
-    
-    return results

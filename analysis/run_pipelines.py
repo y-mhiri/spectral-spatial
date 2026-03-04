@@ -157,12 +157,12 @@ def run_all_pipelines(
         os.path.join(master_output_dir, "noise_impact")
     )
     
-    # Run norm order comparison if directory exists
-    if os.path.exists(norm_study_dir):
-        run_norm_order_comparison(
-            norm_study_dir,
-            os.path.join(master_output_dir, "norm_order_comparison")
-        )
+    # Norm order comparison removed for simplicity
+    # if os.path.exists(norm_study_dir):
+    #     run_norm_order_comparison(
+    #         norm_study_dir,
+    #         os.path.join(master_output_dir, "norm_order_comparison")
+    #     )
     else:
         print("Norm order study directory not found. Skipping norm order comparison.")
     
@@ -188,21 +188,13 @@ def run_all_pipelines(
             'name': 'Noise Impact Analysis',
             'input': noise_study_dir,
             'output': os.path.join(master_output_dir, "noise_impact")
+        },
+        {
+            'name': 'Algorithm Comparison',
+            'input': {'CTV': ctv_study_dir, 'GradAlign': gradalign_study_dir},
+            'output': os.path.join(master_output_dir, "algorithm_comparison")
         }
     ]
-    
-    if norm_study_dir and os.path.exists(norm_study_dir):
-        pipelines.append({
-            'name': 'Norm Order Comparison',
-            'input': norm_study_dir,
-            'output': os.path.join(master_output_dir, "norm_order_comparison")
-        })
-    
-    pipelines.append({
-        'name': 'Algorithm Comparison',
-        'input': {'CTV': ctv_study_dir, 'GradAlign': gradalign_study_dir},
-        'output': os.path.join(master_output_dir, "algorithm_comparison")
-    })
     
     master_summary = {
         'timestamp': timestamp,
@@ -226,8 +218,6 @@ def run_all_pipelines(
     print("Individual pipeline outputs:")
     print(f"  - Convergence: {master_output_dir}/convergence_analysis/")
     print(f"  - Noise Impact: {master_output_dir}/noise_impact/")
-    if norm_study_dir and os.path.exists(norm_study_dir):
-        print(f"  - Norm Order: {master_output_dir}/norm_order_comparison/")
     print(f"  - Algorithm Comparison: {master_output_dir}/algorithm_comparison/")
     print()
     print("Key figures generated:")
@@ -252,8 +242,6 @@ if __name__ == "__main__":
                        help="Directory with CTV algorithm results")
     parser.add_argument("--gradalign_study", type=str, required=True,
                        help="Directory with GradAlign algorithm results")
-    parser.add_argument("--norm_study", type=str, default=None,
-                       help="Directory with norm order study results (optional)")
     parser.add_argument("--output", type=str, default="results/analysis",
                        help="Base output directory")
     
