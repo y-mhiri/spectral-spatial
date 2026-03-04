@@ -7,6 +7,7 @@ result organization for publication-quality figures.
 """
 
 import os
+import sys
 import json
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,6 +15,11 @@ import zarr
 import numpy as np
 from typing import List, Dict, Optional, Union
 from pathlib import Path
+
+# Add current directory to Python path to ensure analysis module can be found
+if __name__ == "__main__":
+    # When running as script, add parent directory to path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import our new modules
 from analysis.plots import plot_single_image, plot_rgb_comparison, plot_convergence_curve, plot_error_map

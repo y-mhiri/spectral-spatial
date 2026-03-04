@@ -91,7 +91,7 @@ def get_metrics_from_data(data: Dict) -> Dict:
         data: Loaded experiment data
         
     Returns:
-        Dictionary of metrics
+        Dictionary of metrics (with original lists if available, otherwise mean values)
     """
     metrics = {}
     
@@ -99,8 +99,15 @@ def get_metrics_from_data(data: Dict) -> Dict:
     metric_names = ['PSNR', 'SSIM', 'SAM', 'RNMSE', 'CC']
     
     for name in metric_names:
+        # Check for original list format first (backward compatibility)
         if name in data:
             metrics[name] = data[name]
+        # Check for new mean format
+        elif f'{name}_mean' in data:
+            mean_value = data[f'{name}_mean']
+            count = data.get(f'{name}_count', 1)
+            # Return as list with mean value repeated for consistency
+            metrics[name] = [mean_value] * count
     
     return metrics
 
