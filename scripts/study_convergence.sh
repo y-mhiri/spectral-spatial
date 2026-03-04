@@ -22,7 +22,9 @@ echo ""
 run_experiment() {
     local algorithm=$1
     local lmbda=$2
-    local output_dir="$RESULTS_DIR/${algorithm}_lambda${lmbda}"
+    local max_iter=$3
+    local max_iter_cp=$4
+    local output_dir="$RESULTS_DIR/${algorithm}_lambda${lmbda}_iter${max_iter}_itercp${max_iter_cp}"
     
     echo "Running $algorithm with λ=$lmbda..."
     
@@ -31,13 +33,14 @@ run_experiment() {
         --dataset_path "$DATASET_PATH" \
         --storage_path "$output_dir" \
         --lmbda "$lmbda" \
-        --lmbda_m 1.0 \
+        --lmbda_m 5.0 \
         --p 2.0 --q 2.0 --r 1.0 \
-        --max_iter 100 \
-        --tol 1e-8 \
-        --noise_level 0.01 \
+        --max_iter "${max_iter}" \
+        --max_iter_cp ${max_iter_cp} \
+        --noise_level 40 \
         --sigma_blur 1.0 \
-        --scale 4
+        --scale 4 \
+        --device cuda
     
     if [ $? -eq 0 ]; then
         echo "✓ $algorithm with λ=$lmbda completed successfully"
@@ -56,19 +59,14 @@ run_experiment() {
 }
 
 # Study convergence for different regularization weights
-for lambda in 0.01 0.05 0.1 0.2; do
-    run_experiment "CTV" "$lambda"
-    run_experiment "GradAlign" "$lambda"
+for lambda in 0.001 0.01; do
+    for it in 5 10 100; do
+        run_experiment "CTV" "$lambda" "100" "$it"
+        run_experiment "GradAlign" "$lambda" "100" "$it"
+    done
 done
 
 echo "Convergence study completed!"
 echo ""
-echo "Summary of results:"
-echo "- CTV algorithm: 4 parameter settings tested"
-echo "- GradAlign algorithm: 4 parameter settings tested"
-echo "- Total experiments: 8"
-echo "- Results location: $RESULTS_DIR"
+echo "Results location: $RESULTS_DIR"
 echo ""
-echo "To analyze convergence:"
-echo "cd $RESULTS_DIR"
-echo "find . -name "convergence_*.png" | xargs ls -lh"
