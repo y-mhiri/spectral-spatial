@@ -34,23 +34,33 @@ def compute_convergence_metrics(loss_array, tol=1e-8):
         Dictionary of convergence metrics
     """
     import numpy as np
-    
-    # Simple convergence detection: when loss changes less than tol for 5 consecutive iterations
-    converged = False
-    conv_iter = len(loss_array)
-    
-    for i in range(len(loss_array) - 5):
-        window = loss_array[i:i+5]
-        if np.max(window) - np.min(window) < tol:
-            converged = True
-            conv_iter = i + 5
-            break
-    
+
+    if loss_array.ndim == 1:
+        loss_array = loss_array[np.newaxis, :]  # (1, n_iter)
+
+    n_samples, n_iter = loss_array.shape
+    conv_iters = []
+    converged_flags = []
+
+    for s in range(n_samples):
+        curve = loss_array[s]
+        converged = False
+        conv_iter = n_iter
+        for i in range(n_iter - 5):
+            window = curve[i:i+5]
+            if np.max(window) - np.min(window) < tol:
+                converged = True
+                conv_iter = i + 5
+                break
+        converged_flags.append(converged)
+        conv_iters.append(conv_iter)
+
     return {
-        'converged': converged,
-        'iteration': conv_iter,
-        'final_loss': float(loss_array[-1]),
-        'loss_reduction': float(loss_array[0] - loss_array[-1])
+        'converged_fraction': float(np.mean(converged_flags)),
+        'iteration_median': int(np.median(conv_iters)),
+        'iteration_max': int(np.max(conv_iters)),
+        'final_loss_mean': float(loss_array[:, -1].mean()),
+        'loss_reduction_mean': float((loss_array[:, 0] - loss_array[:, -1]).mean()),
     }
 
 
