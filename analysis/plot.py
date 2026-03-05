@@ -3,12 +3,18 @@
 All plotting functions for experiment analysis.
 
 Cross-experiment (study directory):
-    from analysis.load import load_results
+    from analysis.load import load_results, filter_results
     from analysis.plot import metric_vs_param, convergence_curves, compare_algorithms
 
     results = load_results("results/my_study")
     metric_vs_param(results, 'lmbda', 'PSNR', 'figs/')
+
+    # single-panel: lines by lambda
     convergence_curves(results, group_by='lmbda', output_dir='figs/')
+
+    # faceted: one panel per algorithm, lines by CP iterations (fix lambda first)
+    subset = filter_results(results, lmbda=0.001)
+    convergence_curves(subset, group_by='max_iter_cp', facet_by='algorithm', output_dir='figs/')
 
     ctv = load_results("results/ctv_study")
     ga  = load_results("results/gradalign_study")
@@ -33,7 +39,7 @@ from pathlib import Path
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .load import metric as get_metric
+from .load import metric as get_metric, filter_results
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -80,21 +86,55 @@ def metric_vs_param(results, param, metric_name, output_dir, title=None):
     _save(f'{output_dir}/{metric_name}_vs_{param}.png')
 
 
-def convergence_curves(results, group_by, output_dir, title=None):
-    """Plot mean loss curves grouped by a parameter (semilogy)."""
-    groups = {}
-    for r in results:
-        groups.setdefault(r.get(group_by, 'unknown'), []).append(r['loss'][0])
+def convergence_curves(results, group_by, output_dir, facet_by=None, title=None):
+    """Plot mean loss curves grouped by a parameter (semilogy).
 
-    plt.figure(figsize=(10, 6))
-    for k, curves in groups.items():
-        plt.semilogy(np.mean(curves, axis=0), label=f'{group_by}={k}', linewidth=2)
-    plt.xlabel('Iteration')
-    plt.ylabel('Loss')
-    plt.title(title or f'Convergence by {group_by}')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    _save(f'{output_dir}/convergence_by_{group_by}.png')
+    facet_by: optional second parameter that creates a subplot per value.
+
+    Examples:
+        # single panel — lines by lambda
+        convergence_curves(results, group_by='lmbda', output_dir='figs/')
+
+        # faceted — one panel per algorithm, lines by CP iterations
+        subset = filter_results(results, lmbda=0.001)
+        convergence_curves(subset, group_by='max_iter_cp', facet_by='algorithm', output_dir='figs/')
+    """
+    if facet_by is None:
+        groups = {}
+        for r in results:
+            groups.setdefault(r.get(group_by, 'unknown'), []).append(r['loss'][0])
+
+        plt.figure(figsize=(10, 6))
+        for k, curves in sorted(groups.items(), key=lambda x: (isinstance(x[0], str), x[0])):
+            plt.semilogy(np.mean(curves, axis=0), label=f'{group_by}={k}', linewidth=2)
+        plt.xlabel('Iteration')
+        plt.ylabel('Loss')
+        plt.title(title or f'Convergence by {group_by}')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        _save(f'{output_dir}/convergence_by_{group_by}.png')
+    else:
+        facets = sorted(set(r.get(facet_by, 'unknown') for r in results),
+                        key=lambda x: (isinstance(x, str), x))
+        fig, axes = plt.subplots(1, len(facets), figsize=(7 * len(facets), 5), sharey=True)
+        if len(facets) == 1:
+            axes = [axes]
+
+        for ax, facet_val in zip(axes, facets):
+            subset = [r for r in results if r.get(facet_by) == facet_val]
+            groups = {}
+            for r in subset:
+                groups.setdefault(r.get(group_by, 'unknown'), []).append(r['loss'][0])
+            for k, curves in sorted(groups.items(), key=lambda x: (isinstance(x[0], str), x[0])):
+                ax.semilogy(np.mean(curves, axis=0), label=f'{group_by}={k}', linewidth=2)
+            ax.set_title(f'{facet_by}={facet_val}')
+            ax.set_xlabel('Iteration')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+
+        axes[0].set_ylabel('Loss')
+        fig.suptitle(title or f'Convergence by {group_by}, faceted by {facet_by}')
+        _save(f'{output_dir}/convergence_{group_by}_by_{facet_by}.png')
 
 
 def compare_algorithms(results_by_alg, metric_name, output_dir, title=None):

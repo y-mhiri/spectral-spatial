@@ -25,6 +25,15 @@ def load_results(study_dir):
     return results
 
 
+def filter_results(results, **conditions):
+    """Select experiments matching exact parameter values.
+
+    Example:
+        subset = filter_results(results, lmbda=0.001, max_iter_cp=50)
+    """
+    return [r for r in results if all(r.get(k) == v for k, v in conditions.items())]
+
+
 def metric(result, name):
     """
     Extract a scalar metric value from a result dict.
