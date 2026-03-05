@@ -68,6 +68,18 @@ def _to_rgb(image, rgb_indices):
     return np.transpose((bands - lo) / (hi - lo + 1e-8), (1, 2, 0))
 
 
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _loss_curve(loss_array, idx=0):
+    """Extract one loss curve from loss_array [N_images, max_iter], masking trailing zeros."""
+    curve = loss_array[idx].astype(float)
+    if curve[-1] == 0:
+        last = np.flatnonzero(curve)
+        if len(last):
+            curve[last[-1] + 1:] = np.nan
+    return curve
+
+
 # ── cross-experiment plots ────────────────────────────────────────────────────
 
 def metric_vs_param(results, param, metric_name, output_dir, title=None):
@@ -106,14 +118,7 @@ def convergence_curves(results, group_by, output_dir, facet_by=None, title=None)
         convergence_curves(subset, group_by='max_iter_cp', facet_by='algorithm', output_dir='figs/')
     """
     def _load_curve(r):
-        curve = r['loss'][0].copy().astype(float)
-        # Early stopping leaves trailing zeros in the pre-allocated array.
-        # Replace them with NaN so semilogy ignores them and nanmean stays correct.
-        if curve[-1] == 0:
-            last = np.flatnonzero(curve)
-            if len(last):
-                curve[last[-1] + 1:] = np.nan
-        return curve
+        return _loss_curve(r['loss'])
 
     def _plot_groups(ax, subset, group_by):
         groups = {}
@@ -200,12 +205,8 @@ def visualize(zarr_path, output_dir, rgb_indices=None, dataset_path=None):
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     algorithm = results.get('algorithm', 'Algorithm')
 
-    # Convergence
-    loss = results['loss'][0].astype(float)
-    if loss[-1] == 0:
-        last = np.flatnonzero(loss)
-        if len(last):
-            loss[last[-1] + 1:] = np.nan
+    # Convergence — single sample (image 0), early-stopping zeros masked
+    loss = _loss_curve(results['loss'])
     plt.figure(figsize=(8, 5))
     plt.semilogy(loss)
     plt.xlabel('Iteration'); plt.ylabel('Loss')

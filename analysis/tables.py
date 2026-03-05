@@ -35,9 +35,9 @@ from pathlib import Path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from .load import load_results
+    from .load import load_results, filter_results
 except ImportError:
-    from analysis.load import load_results
+    from analysis.load import load_results, filter_results
 
 
 # ── metric definitions ────────────────────────────────────────────────────────
@@ -136,13 +136,21 @@ def _save_csv(rows, path):
 
 def main():
     parser = argparse.ArgumentParser(description='Metric summary tables for a study')
-    parser.add_argument('--study_dir',  required=True, help='Directory produced by a study_*.sh script')
-    parser.add_argument('--output_dir', default=None,  help='Output directory (default: <study_dir>/tables)')
-    parser.add_argument('--group_by',   default=None,  help='Override auto-detection (e.g. lmbda, algorithm)')
+    parser.add_argument('--study_dir',   required=True, help='Directory produced by a study_*.sh script')
+    parser.add_argument('--output_dir',  default=None,  help='Output directory (default: <study_dir>/tables)')
+    parser.add_argument('--group_by',    default=None,  help='Override auto-detection (e.g. lmbda, algorithm)')
+    parser.add_argument('--lmbda',       type=float,    default=None, help='Fix λ before summarizing')
+    parser.add_argument('--max_iter_cp', type=int,      default=None, help='Fix CP iterations before summarizing')
+    parser.add_argument('--algorithm',   default=None,               help='Fix algorithm before summarizing')
     args = parser.parse_args()
 
     output_dir = args.output_dir or f'{args.study_dir}/tables'
     results = load_results(args.study_dir)
+
+    filters = {k: v for k, v in [('lmbda', args.lmbda), ('max_iter_cp', args.max_iter_cp),
+                                   ('algorithm', args.algorithm)] if v is not None}
+    if filters:
+        results = filter_results(results, **filters)
 
     groups = [args.group_by] if args.group_by else [
         p for p in CANDIDATE_GROUPS
