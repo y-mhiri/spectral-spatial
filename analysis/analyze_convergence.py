@@ -20,7 +20,7 @@ import argparse
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from analysis.load import load_results
+from analysis.load import load_results, filter_results
 from analysis.plot import convergence_curves, compare_algorithms
 
 METRICS = ['PSNR', 'SSIM', 'SAM', 'RNMSE']
@@ -28,12 +28,18 @@ METRICS = ['PSNR', 'SSIM', 'SAM', 'RNMSE']
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze convergence study results')
-    parser.add_argument('--study_dir',  required=True, help='Directory produced by scripts/study_convergence.sh')
-    parser.add_argument('--output_dir', default=None,  help='Output directory (default: <study_dir>/analysis)')
+    parser.add_argument('--study_dir',   required=True, help='Directory produced by scripts/study_convergence.sh')
+    parser.add_argument('--output_dir',  default=None,  help='Output directory (default: <study_dir>/analysis)')
+    parser.add_argument('--lmbda',       type=float,    default=None, help='Fix λ to a specific value')
+    parser.add_argument('--max_iter_cp', type=int,      default=None, help='Fix CP iterations to a specific value')
     args = parser.parse_args()
 
     output_dir = args.output_dir or f'{args.study_dir}/analysis'
     results = load_results(args.study_dir)
+
+    filters = {k: v for k, v in [('lmbda', args.lmbda), ('max_iter_cp', args.max_iter_cp)] if v is not None}
+    if filters:
+        results = filter_results(results, **filters)
 
     # Q1: Does CP iteration count affect convergence?
     # Lines = CP values, averaged over λ → marginal effect of inner solver.
