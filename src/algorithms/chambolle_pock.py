@@ -116,7 +116,7 @@ class ChambollePock(nn.Module):
         """
         pass
 
-    def forward(self, y, init=None, verbose=True, params={}, return_loss=True):
+    def forward(self, y, init=None, verbose=True, params=None, return_loss=True):
         """
             Solve the optimization problem using the Chambolle-Pock algorithm
 
@@ -131,6 +131,9 @@ class ChambollePock(nn.Module):
             - loss: loss function at each iteration
 
         """
+
+        if params is None:
+            params = {}
 
         b,c,h,w = y.shape
 

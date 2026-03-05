@@ -48,7 +48,7 @@ def compute_convergence_metrics(loss_array, tol=1e-8):
     
     return {
         'converged': converged,
-        'convergence_iteration': conv_iter,
+        'iteration': conv_iter,
         'final_loss': float(loss_array[-1]),
         'loss_reduction': float(loss_array[0] - loss_array[-1])
     }

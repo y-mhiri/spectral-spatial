@@ -69,12 +69,13 @@ def run_experiment(args):
     
     # Initialize results storage
     metrics = {}
-    reconstructed_ar = torch.zeros([len(dataset), dataset.nband, dataset.width, dataset.height],
+    reconstructed_ar = torch.zeros([len(dataset), dataset.nband, dataset.height, dataset.width],
                                   device=device, dtype=dtype)
     loss_ar = torch.zeros([len(dataset), args.max_iter], device=device, dtype=dtype)
     relval_ar = torch.zeros([len(dataset), args.max_iter], device=device, dtype=dtype)
-    
+
     # Run algorithm on each image
+    start_time = time.time()
     for j in range(len(dataset)):
         print(f"Processing image {j+1}/{len(dataset)}")
         
@@ -102,12 +103,10 @@ def run_experiment(args):
                                      p=args.p, q=args.q, r=args.r, verbose=True, init_params=chambolle_params)
         
         # Run optimization
-        start_time = time.time()
         reconstructed, loss, relval = optim(Y_H, Y_M)
-        compute_time = time.time() - start_time
-        
+
         # Store results
-        reconstructed_ar[j] = reconstructed
+        reconstructed_ar[j] = reconstructed.squeeze(0)
         loss_ar[j] = loss
         relval_ar[j] = relval
         
@@ -122,6 +121,7 @@ def run_experiment(args):
         torch.cuda.empty_cache()
     
     # Save results
+    compute_time = time.time() - start_time
     root = zarr.open(f'{args.storage_path}/results.zarr', mode='w')
     store_results(root, args, reconstructed_ar, loss_ar, relval_ar, metrics, compute_time, args.algorithm)
     save_experiment_info(args.storage_path, args, compute_time, metrics, args.algorithm)
@@ -157,8 +157,8 @@ def main():
     # Dataset parameters
     parser.add_argument("--scale", type=int, default=4,
                        help="Downsampling factor")
-    parser.add_argument("--noise_level", type=float, default=0.01,
-                       help="Noise level (variance)")
+    parser.add_argument("--noise_level", type=float, default=40,
+                       help="Noise level in dB (e.g. 40 for -40 dB). Passed to PANDataset as 10^(-noise_level/20).")
     parser.add_argument("--sigma_blur", type=float, default=1.0,
                        help="Blur standard deviation")
     

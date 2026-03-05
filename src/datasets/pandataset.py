@@ -41,7 +41,7 @@ class PANDataset(data.Dataset):
             normalize (bool): Normalisation [0,1] si True
             scale (int): Facteur de sous-échantillonnage
             sigma_blur (float): Paramètre du flou gaussien
-            noise_level (float) : noise variance 
+            noise_level (float) : noise level in dB; converted internally as 10^(-noise_level/20)
             device (str): Device pour les opérations
         """
         super().__init__()

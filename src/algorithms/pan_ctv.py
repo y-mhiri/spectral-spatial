@@ -48,16 +48,14 @@ class PANCTV(PANProximalGradient):
         """
         params = {}
 
-        params['compute_L'] = {'nband': 31}
+        params['compute_L'] = {'nband': x.shape[1]}
         params['K'] = {}
         params['K_adjoint'] = {}
         params['prox_sigma_g_conj'] = {}
         params['prox_tau_f'] = {'y': x, 'sigma2': 1}
         params['loss_fn'] = {}
 
-        # self.optim.lmbda = self.optim.lmbda * gamma
-
-        return self.optim(x,init=None, verbose=False, params=params, return_loss=False)
+        return self.optim(x, init=None, verbose=False, params=params, return_loss=False)
     
 
     def compute_cost(self, U, Y_H, Y_M):

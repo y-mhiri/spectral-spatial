@@ -36,12 +36,13 @@ class PANProximalGradient(nn.Module):
         self.q = q 
         self.r = r
 
-        # Configuration du logger simple vers stdout
+        # Logger — only add handler once (avoid duplicates across multiple instantiations)
         self.logger = logging.getLogger('PANProximalGradient')
-        self.logger.setLevel(logging.INFO)
-        ch = logging.StreamHandler(sys.stdout)
-        ch.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        self.logger.addHandler(ch)
+        if not self.logger.handlers:
+            self.logger.setLevel(logging.INFO)
+            ch = logging.StreamHandler(sys.stdout)
+            ch.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+            self.logger.addHandler(ch)
 
 
     def ctv_norm(self, U, eps=1e-8):

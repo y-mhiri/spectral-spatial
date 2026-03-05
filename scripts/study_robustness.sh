@@ -1,0 +1,64 @@
+#!/bin/bash
+# Robustness study: compare CTV and GradAlign across noise and blur conditions.
+# Answers: how does reconstruction quality degrade with harder degradation?
+#
+# Usage: DATASET_PATH=/path/to/data.zarr [DEVICE=cpu] ./scripts/study_robustness.sh
+
+if [ -z "$DATASET_PATH" ]; then
+    echo "ERROR: DATASET_PATH environment variable not set"
+    exit 1
+fi
+
+DEVICE=${DEVICE:-cuda}
+RESULTS_DIR="results/robustness_study_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$RESULTS_DIR"
+
+echo "Starting robustness study"
+echo "Dataset: $DATASET_PATH"
+echo "Device:  $DEVICE"
+echo "Results: $RESULTS_DIR"
+echo ""
+
+run_experiment() {
+    local algorithm=$1
+    local noise_level=$2
+    local sigma_blur=$3
+    local output_dir="$RESULTS_DIR/${algorithm}_noise${noise_level}_blur${sigma_blur}"
+
+    echo "Running $algorithm  noise=${noise_level}dB  blur=$sigma_blur ..."
+
+    python experiments/experiment_simple.py \
+        --algorithm     "$algorithm" \
+        --dataset_path  "$DATASET_PATH" \
+        --storage_path  "$output_dir" \
+        --lmbda         0.1 \
+        --lmbda_m       1.0 \
+        --p 2.0 --q 2.0 --r 1.0 \
+        --max_iter      50 \
+        --max_iter_cp   50 \
+        --tol           1e-8 \
+        --noise_level   "$noise_level" \
+        --sigma_blur    "$sigma_blur" \
+        --scale         4 \
+        --device        "$DEVICE"
+
+    if [ $? -eq 0 ]; then
+        echo "  ✓ done"
+    else
+        echo "  ✗ failed"
+    fi
+    echo ""
+}
+
+# 3 noise levels × 2 blur levels × 2 algorithms = 12 experiments
+for noise_db in 35 40 45; do
+    for blur in 0.5 2.0; do
+        run_experiment "CTV"       "$noise_db" "$blur"
+        run_experiment "GradAlign" "$noise_db" "$blur"
+    done
+done
+
+echo "Done. Results: $RESULTS_DIR"
+echo ""
+echo "Analyze with:"
+echo "  python analysis/analyze.py --study_dir $RESULTS_DIR --group_by noise_level"

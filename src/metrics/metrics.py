@@ -28,7 +28,7 @@ def SAM(A,B):
     return torch.acos((A*B).sum(dim=1)).mean()
 
 def SSIM(A,B):
-    assert A.shape == B.shape ,""" assert A.shape == B.shape, "A and B must have the same shape """
+    assert A.shape == B.shape, "A and B must have the same shape"
     m = dinv_SSIM()
     return m(B,A)[0] # attention à ne pas passer des batchs. 
 
