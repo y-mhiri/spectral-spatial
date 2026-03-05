@@ -21,11 +21,13 @@ Cross-experiment (study directory):
     compare_algorithms({'CTV': ctv, 'GradAlign': ga}, 'PSNR', 'figs/')
 
 Single experiment (zarr path):
-    from analysis.plot import visualize
-    visualize('results/exp/results.zarr', 'figs/', rgb_indices=[20, 10, 5])
+    from analysis.plot import visualize, visualize_gradalign
+    visualize('results/exp/results.zarr',          'figs/', rgb_indices=[20, 10, 5])
+    visualize_gradalign('results/exp/results.zarr', 'figs/', rgb_indices=[20, 10, 5])
 
 CLI:
     python analysis/plot.py --zarr_path results/exp/results.zarr --output_dir figs/
+    python analysis/plot.py --zarr_path results/exp/results.zarr --output_dir figs/ --gradalign
 """
 
 import sys
@@ -162,103 +164,158 @@ def compare_algorithms(results_by_alg, metric_name, output_dir, title=None):
 
 # ── single-experiment plots ───────────────────────────────────────────────────
 
-def _simulate_inputs(results, dataset_path):
-    """
-    Re-simulate Y_H and Y_M for image 0 using stored experiment params.
-    noise=False: shows degradation structure (blur+downsample, spectral avg) without
-    a stochastic noise realization.
-    """
+def _load_dataset(results, dataset_path):
+    """Instantiate PANDataset from stored experiment params."""
     import torch
     from src.datasets.pandataset import PANDataset
-
     dataset = PANDataset(
-        root_dir=dataset_path,
-        split='train',
-        normalize=True,
+        root_dir=dataset_path, split='train', normalize=True,
         scale=int(results.get('scale', 4)),
         sigma_blur=float(results.get('sigma_blur', 1.0)),
         noise_level=float(results.get('noise_level', 40)),
-        device='cpu',
-        seed=int(results.get('seed', 42))
+        device='cpu', seed=int(results.get('seed', 42))
     )
-    X = dataset[0].unsqueeze(0)
-    Y_H = dataset.simulate_low_res_hsi(X, noise=False).squeeze(0).cpu().numpy()
-    Y_M = dataset.simulate_panchromatic(X, noise=False).squeeze(0).cpu().numpy()
-    return Y_H, Y_M
+    return dataset
 
 
 def visualize(zarr_path, output_dir, rgb_indices=None, dataset_path=None):
     """
-    Visualize a single experiment. Generates up to three figures:
-      convergence.png     — loss curve (always)
-      reconstruction.png  — original / reconstructed / error
-      inputs.png          — LR HSI and panchromatic inputs
+    Visualize a single experiment.
 
-    dataset_path is optional: falls back to the path stored in the zarr attrs.
+    Outputs (in output_dir):
+      convergence.png     — loss curve
+      inputs.png          — ground truth | LR HSI | panchromatic
+      reconstruction.png  — ground truth | reconstructed | error map
+
+    dataset_path is optional: falls back to the path stored in zarr attrs.
     """
     root = zarr.open(zarr_path, mode='r')
-    results = {'reconstructed': root['reconstructed'][:], 'loss': root['loss'][:]}
-    results.update(dict(root.attrs))
-
+    results = dict(root.attrs)
+    results['reconstructed'] = root['reconstructed'][:]
+    results['loss'] = root['loss'][:]
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     algorithm = results.get('algorithm', 'Algorithm')
 
     # Convergence
+    loss = results['loss'][0].astype(float)
+    if loss[-1] == 0:
+        last = np.flatnonzero(loss)
+        if len(last):
+            loss[last[-1] + 1:] = np.nan
     plt.figure(figsize=(8, 5))
-    plt.semilogy(results['loss'][0])
+    plt.semilogy(loss)
     plt.xlabel('Iteration'); plt.ylabel('Loss')
-    plt.title(f'{algorithm} Convergence'); plt.grid(True, alpha=0.3)
+    plt.title(f'{algorithm} — Convergence'); plt.grid(True, alpha=0.3)
     _save(f'{output_dir}/convergence.png')
 
     dataset_path = dataset_path or results.get('dataset_path')
     if dataset_path is None:
-        print('No dataset_path — skipping reconstruction and inputs plots.')
-    else:
-        # Reconstruction
-        try:
-            ds = zarr.open(dataset_path, mode='r')
-            original     = np.transpose(ds['train/0'][:], (2, 0, 1))
-            reconstructed = results['reconstructed'][0]
-            orig_rgb  = _to_rgb(original, rgb_indices)
-            recon_rgb = _to_rgb(reconstructed, rgb_indices)
-            error = np.abs(orig_rgb - recon_rgb).mean(axis=2)
+        print('No dataset_path — skipping inputs and reconstruction plots.')
+        _print_metrics(results, algorithm)
+        return
 
-            fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-            axes[0].imshow(orig_rgb);   axes[0].set_title('Original');      axes[0].axis('off')
-            axes[1].imshow(recon_rgb);  axes[1].set_title('Reconstructed'); axes[1].axis('off')
-            im = axes[2].imshow(error, cmap='viridis')
-            axes[2].set_title('Error'); axes[2].axis('off')
-            plt.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
-            plt.suptitle(algorithm)
-            _save(f'{output_dir}/reconstruction.png')
-        except Exception as e:
-            print(f'Skipping reconstruction plot: {e}')
+    import torch
+    dataset = _load_dataset(results, dataset_path)
+    X = dataset[0].unsqueeze(0)
+    original     = np.transpose(zarr.open(dataset_path, mode='r')['train/0'][:], (2, 0, 1))
+    Y_H          = dataset.simulate_low_res_hsi(X, noise=False).squeeze(0).cpu().numpy()
+    Y_M          = dataset.simulate_panchromatic(X, noise=False).squeeze(0).cpu().numpy()
+    pan_norm     = (Y_M[0] - Y_M[0].min()) / (Y_M[0].max() - Y_M[0].min() + 1e-8)
 
-        # Inputs
-        try:
-            Y_H, Y_M = _simulate_inputs(results, dataset_path)
-            fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-            axes[0].imshow(_to_rgb(Y_H, rgb_indices))
-            axes[0].set_title('LR HSI (noiseless)'); axes[0].axis('off')
-            pan = Y_M[0]
-            axes[1].imshow((pan - pan.min()) / (pan.max() - pan.min() + 1e-8), cmap='gray')
-            axes[1].set_title('Panchromatic (noiseless)'); axes[1].axis('off')
-            _save(f'{output_dir}/inputs.png')
-        except Exception as e:
-            print(f'Skipping inputs plot: {e}')
+    # Inputs: GT | LR HSI | PAN
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    axes[0].imshow(_to_rgb(original, rgb_indices)); axes[0].set_title('Ground truth');       axes[0].axis('off')
+    axes[1].imshow(_to_rgb(Y_H, rgb_indices));      axes[1].set_title('LR HSI (noiseless)'); axes[1].axis('off')
+    axes[2].imshow(pan_norm, cmap='gray');           axes[2].set_title('Panchromatic');       axes[2].axis('off')
+    plt.suptitle(algorithm)
+    _save(f'{output_dir}/inputs.png')
 
+    # Reconstruction: GT | Reconstructed | Error
+    orig_rgb  = _to_rgb(original, rgb_indices)
+    recon_rgb = _to_rgb(results['reconstructed'][0], rgb_indices)
+    error     = np.abs(orig_rgb - recon_rgb).mean(axis=2)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    axes[0].imshow(orig_rgb);  axes[0].set_title('Ground truth');  axes[0].axis('off')
+    axes[1].imshow(recon_rgb); axes[1].set_title('Reconstructed'); axes[1].axis('off')
+    im = axes[2].imshow(error, cmap='hot')
+    axes[2].set_title('Error map'); axes[2].axis('off')
+    plt.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
+    plt.suptitle(algorithm)
+    _save(f'{output_dir}/reconstruction.png')
+
+    _print_metrics(results, algorithm)
+
+
+def _print_metrics(results, algorithm):
     print(f'\n=== {algorithm} ===')
     for name in ['PSNR', 'SSIM', 'SAM', 'RNMSE', 'CC']:
         if f'{name}_mean' in results:
             print(f'  {name}: {results[f"{name}_mean"]:.4f}')
 
 
+def visualize_gradalign(zarr_path, output_dir, rgb_indices=None, dataset_path=None):
+    """
+    GradAlign-specific visualization. Calls visualize() then adds:
+      gradalign_criterion.png  — criterion c(x,y) = ‖∇Y_M‖/Σ‖∇Y_M‖, with Otsu contour
+      gradalign_mask.png       — alignment-active regions (c ≥ α) overlaid on PAN
+
+    The criterion drives the Otsu threshold α that decides where hyperspectral
+    gradients are aligned with the PAN structure.
+    """
+    import torch
+    from src.algorithms.nabla import nabla
+    from src.algorithms.prox_tv_grad_align import compute_alpha_from_pan
+
+    visualize(zarr_path, output_dir, rgb_indices, dataset_path)
+
+    root = zarr.open(zarr_path, mode='r')
+    results = dict(root.attrs)
+    dataset_path = dataset_path or results.get('dataset_path')
+    if dataset_path is None:
+        print('No dataset_path — skipping GradAlign feature plots.')
+        return
+
+    dataset = _load_dataset(results, dataset_path)
+    X   = dataset[0].unsqueeze(0)
+    Y_M = dataset.simulate_panchromatic(X, noise=False)          # [1, 1, H, W]
+
+    grad_panc = nabla(Y_M)                                        # [1, 1, H, W, 2]
+    norm_grad = torch.norm(grad_panc.squeeze(), dim=-1)           # [H, W]
+    c         = (norm_grad / (norm_grad.sum() + 1e-7)).cpu().numpy()
+    alpha     = compute_alpha_from_pan(grad_panc)
+    pan_norm  = (Y_M[0, 0].cpu().numpy())
+    pan_norm  = (pan_norm - pan_norm.min()) / (pan_norm.max() - pan_norm.min() + 1e-8)
+
+    # Criterion map with Otsu contour
+    plt.figure(figsize=(8, 6))
+    im = plt.imshow(c, cmap='viridis')
+    plt.colorbar(im, fraction=0.046, pad=0.04)
+    plt.contour(c, levels=[alpha], colors='red', linewidths=1)
+    plt.title(f'GradAlign criterion c(x,y)   α = {alpha:.2e} (Otsu)')
+    plt.axis('off')
+    _save(f'{output_dir}/gradalign_criterion.png')
+
+    # Alignment mask overlaid on PAN
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    axes[0].imshow(pan_norm, cmap='gray')
+    axes[0].set_title('Panchromatic'); axes[0].axis('off')
+    axes[1].imshow(pan_norm, cmap='gray')
+    axes[1].imshow(c >= alpha, alpha=0.45, cmap='Reds')
+    axes[1].set_title(f'Alignment mask  (α = {alpha:.2e})'); axes[1].axis('off')
+    plt.suptitle('GradAlign — edge alignment regions')
+    _save(f'{output_dir}/gradalign_mask.png')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Visualize a single experiment result')
-    parser.add_argument('--zarr_path', required=True)
-    parser.add_argument('--output_dir', default='visualization_results')
-    parser.add_argument('--rgb_indices', type=int, nargs='+', default=None)
+    parser.add_argument('--zarr_path',    required=True)
+    parser.add_argument('--output_dir',   default='visualization_results')
+    parser.add_argument('--rgb_indices',  type=int, nargs='+', default=None)
     parser.add_argument('--dataset_path', default=None,
                         help='Path to dataset zarr (optional: stored path is used if omitted)')
+    parser.add_argument('--gradalign',    action='store_true',
+                        help='Also produce GradAlign-specific feature figures')
     args = parser.parse_args()
-    visualize(args.zarr_path, args.output_dir, args.rgb_indices, args.dataset_path)
+
+    fn = visualize_gradalign if args.gradalign else visualize
+    fn(args.zarr_path, args.output_dir, args.rgb_indices, args.dataset_path)

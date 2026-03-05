@@ -34,9 +34,9 @@ run_experiment() {
         --lmbda         "$lmbda" \
         --lmbda_m       1.0 \
         --p 2.0 --q 2.0 --r 1.0 \
-        --max_iter      100 \
+        --max_iter      10000 \
         --max_iter_cp   "$max_iter_cp" \
-        --noise_level   40 \
+        --noise_level   45 \
         --sigma_blur    1.0 \
         --scale         4 \
         --device        "$DEVICE"
@@ -59,4 +59,4 @@ done
 echo "Done. Results: $RESULTS_DIR"
 echo ""
 echo "Analyze with:"
-echo "  python analysis/analyze.py --study_dir $RESULTS_DIR --group_by lmbda"
+echo "  python analysis/analyze_convergence.py --study_dir $RESULTS_DIR"
