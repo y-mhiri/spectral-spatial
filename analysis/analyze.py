@@ -10,6 +10,9 @@ Usage:
     python analysis/analyze.py --study_dir results/robustness_study_...  --group_by noise_level
     python analysis/analyze.py --study_dir results/norm_study_...        --group_by p
 
+    # Faceted convergence: one panel per algorithm, lines by CP iterations
+    python analysis/analyze.py --study_dir results/... --group_by max_iter_cp --facet_by algorithm
+
 Output is saved to <study_dir>/analysis/ by default.
 """
 
@@ -29,6 +32,7 @@ def main():
     parser = argparse.ArgumentParser(description='Analyze study results')
     parser.add_argument('--study_dir',  required=True,  help='Directory produced by a study_*.sh script')
     parser.add_argument('--group_by',   required=True,  help='Parameter to group by (e.g. lmbda, noise_level, p)')
+    parser.add_argument('--facet_by',   default=None,   help='Optional second parameter for subplot faceting (e.g. algorithm)')
     parser.add_argument('--output_dir', default=None,   help='Output directory (default: <study_dir>/analysis)')
     args = parser.parse_args()
 
@@ -37,7 +41,7 @@ def main():
     results = load_results(args.study_dir)
 
     # Convergence curves and metrics vs swept parameter
-    convergence_curves(results, group_by=args.group_by, output_dir=output_dir)
+    convergence_curves(results, group_by=args.group_by, facet_by=args.facet_by, output_dir=output_dir)
     for m in METRICS:
         metric_vs_param(results, args.group_by, m, output_dir)
 
