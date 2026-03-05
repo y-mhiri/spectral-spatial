@@ -24,30 +24,29 @@ run_experiment() {
     local noise_level=$2
     local sigma_blur=$3
     local output_dir="$RESULTS_DIR/${algorithm}_noise${noise_level}_blur${sigma_blur}"
+    local session="${algorithm}_noise${noise_level}_blur${sigma_blur}"
+    local logfile="$output_dir/run.log"
 
-    echo "Running $algorithm  noise=${noise_level}dB  blur=$sigma_blur ..."
+    mkdir -p "$output_dir"
+    echo "  Launching [$session]  log -> $logfile"
 
-    python experiments/experiment_simple.py \
-        --algorithm     "$algorithm" \
-        --dataset_path  "$DATASET_PATH" \
-        --storage_path  "$output_dir" \
-        --lmbda         0.1 \
-        --lmbda_m       1.0 \
-        --p 2.0 --q 2.0 --r 1.0 \
-        --max_iter      50 \
-        --max_iter_cp   50 \
-        --tol           1e-8 \
-        --noise_level   "$noise_level" \
-        --sigma_blur    "$sigma_blur" \
-        --scale         4 \
-        --device        "$DEVICE"
-
-    if [ $? -eq 0 ]; then
-        echo "  ✓ done"
-    else
-        echo "  ✗ failed"
-    fi
-    echo ""
+    screen -dmS "$session" bash -c "
+        python experiments/experiment_simple.py \
+            --algorithm     '$algorithm' \
+            --dataset_path  '$DATASET_PATH' \
+            --storage_path  '$output_dir' \
+            --lmbda         0.1 \
+            --lmbda_m       1.0 \
+            --p 2.0 --q 2.0 --r 1.0 \
+            --max_iter      50 \
+            --max_iter_cp   50 \
+            --tol           1e-8 \
+            --noise_level   '$noise_level' \
+            --sigma_blur    '$sigma_blur' \
+            --scale         4 \
+            --device        '$DEVICE' \
+        > '$logfile' 2>&1
+    "
 }
 
 # 3 noise levels × 2 blur levels × 2 algorithms = 12 experiments
@@ -58,7 +57,9 @@ for noise_db in 35 40 45; do
     done
 done
 
-echo "Done. Results: $RESULTS_DIR"
+echo ""
+echo "All sessions launched. Monitor with:  screen -ls"
+echo "Follow a run with:  tail -f $RESULTS_DIR/<run>/run.log"
 echo ""
 echo "Analyze with:"
 echo "  python analysis/analyze.py --study_dir $RESULTS_DIR --group_by noise_level"

@@ -24,29 +24,28 @@ run_experiment() {
     local lmbda=$2
     local max_iter_cp=$3
     local output_dir="$RESULTS_DIR/${algorithm}_lambda${lmbda}_cp${max_iter_cp}"
+    local session="${algorithm}_l${lmbda}_cp${max_iter_cp}"
+    local logfile="$output_dir/run.log"
 
-    echo "Running $algorithm  λ=$lmbda  CP_iter=$max_iter_cp ..."
+    mkdir -p "$output_dir"
+    echo "  Launching [$session]  log -> $logfile"
 
-    python experiments/experiment_simple.py \
-        --algorithm     "$algorithm" \
-        --dataset_path  "$DATASET_PATH" \
-        --storage_path  "$output_dir" \
-        --lmbda         "$lmbda" \
-        --lmbda_m       1.0 \
-        --p 2.0 --q 2.0 --r 1.0 \
-        --max_iter      10000 \
-        --max_iter_cp   "$max_iter_cp" \
-        --noise_level   45 \
-        --sigma_blur    1.0 \
-        --scale         4 \
-        --device        "$DEVICE"
-
-    if [ $? -eq 0 ]; then
-        echo "  ✓ done"
-    else
-        echo "  ✗ failed"
-    fi
-    echo ""
+    screen -dmS "$session" bash -c "
+        python experiments/experiment_simple.py \
+            --algorithm     '$algorithm' \
+            --dataset_path  '$DATASET_PATH' \
+            --storage_path  '$output_dir' \
+            --lmbda         '$lmbda' \
+            --lmbda_m       1.0 \
+            --p 2.0 --q 2.0 --r 1.0 \
+            --max_iter      10000 \
+            --max_iter_cp   '$max_iter_cp' \
+            --noise_level   45 \
+            --sigma_blur    1.0 \
+            --scale         4 \
+            --device        '$DEVICE' \
+        > '$logfile' 2>&1
+    "
 }
 
 for lmbda in 0.00001 0.0001 0.001 0.01; do
@@ -56,7 +55,9 @@ for lmbda in 0.00001 0.0001 0.001 0.01; do
     done
 done
 
-echo "Done. Results: $RESULTS_DIR"
+echo ""
+echo "All sessions launched. Monitor with:  screen -ls"
+echo "Follow a run with:  tail -f $RESULTS_DIR/<run>/run.log"
 echo ""
 echo "Analyze with:"
 echo "  python analysis/analyze_convergence.py --study_dir $RESULTS_DIR"

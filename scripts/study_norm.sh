@@ -25,30 +25,29 @@ run_experiment() {
     local q=$3
     local r=$4
     local output_dir="$RESULTS_DIR/${algorithm}_p${p}_q${q}_r${r}"
+    local session="${algorithm}_p${p}_q${q}_r${r}"
+    local logfile="$output_dir/run.log"
 
-    echo "Running $algorithm  p=$p  q=$q  r=$r ..."
+    mkdir -p "$output_dir"
+    echo "  Launching [$session]  log -> $logfile"
 
-    python experiments/experiment_simple.py \
-        --algorithm     "$algorithm" \
-        --dataset_path  "$DATASET_PATH" \
-        --storage_path  "$output_dir" \
-        --lmbda         0.1 \
-        --lmbda_m       1.0 \
-        --p "$p" --q "$q" --r "$r" \
-        --max_iter      50 \
-        --max_iter_cp   50 \
-        --tol           1e-8 \
-        --noise_level   40 \
-        --sigma_blur    1.0 \
-        --scale         4 \
-        --device        "$DEVICE"
-
-    if [ $? -eq 0 ]; then
-        echo "  ✓ done"
-    else
-        echo "  ✗ failed"
-    fi
-    echo ""
+    screen -dmS "$session" bash -c "
+        python experiments/experiment_simple.py \
+            --algorithm     '$algorithm' \
+            --dataset_path  '$DATASET_PATH' \
+            --storage_path  '$output_dir' \
+            --lmbda         0.1 \
+            --lmbda_m       1.0 \
+            --p '$p' --q '$q' --r '$r' \
+            --max_iter      50 \
+            --max_iter_cp   50 \
+            --tol           1e-8 \
+            --noise_level   40 \
+            --sigma_blur    1.0 \
+            --scale         4 \
+            --device        '$DEVICE' \
+        > '$logfile' 2>&1
+    "
 }
 
 # Norm combinations to test: "p q r"
@@ -66,7 +65,9 @@ for combo in "${norm_combinations[@]}"; do
     run_experiment "GradAlign" "$p" "$q" "$r"
 done
 
-echo "Done. Results: $RESULTS_DIR"
+echo ""
+echo "All sessions launched. Monitor with:  screen -ls"
+echo "Follow a run with:  tail -f $RESULTS_DIR/<run>/run.log"
 echo ""
 echo "Analyze with:"
 echo "  python analysis/analyze.py --study_dir $RESULTS_DIR --group_by p"
