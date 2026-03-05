@@ -26,8 +26,9 @@ Single experiment (zarr path):
     visualize_gradalign('results/exp/results.zarr', 'figs/', rgb_indices=[20, 10, 5])
 
 CLI:
-    python analysis/plot.py --zarr_path results/exp/results.zarr --output_dir figs/
-    python analysis/plot.py --zarr_path results/exp/results.zarr --output_dir figs/ --gradalign
+    python analysis/plot.py --zarr_path results/exp/results.zarr
+    python analysis/plot.py --zarr_path results/exp/results.zarr --gradalign
+    python analysis/plot.py --study_dir results/convergence_study_...   # all experiments
 """
 
 import sys
@@ -41,7 +42,10 @@ from pathlib import Path
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .load import metric as get_metric, filter_results
+try:
+    from .load import metric as get_metric, filter_results
+except ImportError:
+    from analysis.load import metric as get_metric, filter_results
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -307,9 +311,12 @@ def visualize_gradalign(zarr_path, output_dir, rgb_indices=None, dataset_path=No
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Visualize a single experiment result')
-    parser.add_argument('--zarr_path',    required=True)
-    parser.add_argument('--output_dir',   default='visualization_results')
+    parser = argparse.ArgumentParser(description='Visualize experiment results')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--zarr_path',  help='Path to a single results.zarr')
+    group.add_argument('--study_dir',  help='Study directory (visualizes all experiments inside)')
+    parser.add_argument('--output_dir',   default=None,
+                        help='Output directory (default: next to zarr / <study_dir>/visualizations)')
     parser.add_argument('--rgb_indices',  type=int, nargs='+', default=None)
     parser.add_argument('--dataset_path', default=None,
                         help='Path to dataset zarr (optional: stored path is used if omitted)')
@@ -318,4 +325,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     fn = visualize_gradalign if args.gradalign else visualize
-    fn(args.zarr_path, args.output_dir, args.rgb_indices, args.dataset_path)
+
+    if args.zarr_path:
+        out = args.output_dir or str(Path(args.zarr_path).parent / 'visualizations')
+        fn(args.zarr_path, out, args.rgb_indices, args.dataset_path)
+    else:
+        from glob import glob
+        zarr_paths = sorted(glob(f'{args.study_dir}/*/results.zarr'))
+        if not zarr_paths:
+            raise ValueError(f'No results.zarr found in {args.study_dir}')
+        base_out = args.output_dir or f'{args.study_dir}/visualizations'
+        for zp in zarr_paths:
+            exp_name = Path(zp).parent.name
+            fn(zp, f'{base_out}/{exp_name}', args.rgb_indices, args.dataset_path)
