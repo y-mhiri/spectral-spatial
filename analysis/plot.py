@@ -99,14 +99,26 @@ def convergence_curves(results, group_by, output_dir, facet_by=None, title=None)
         subset = filter_results(results, lmbda=0.001)
         convergence_curves(subset, group_by='max_iter_cp', facet_by='algorithm', output_dir='figs/')
     """
-    if facet_by is None:
-        groups = {}
-        for r in results:
-            groups.setdefault(r.get(group_by, 'unknown'), []).append(r['loss'][0])
+    def _load_curve(r):
+        curve = r['loss'][0].copy().astype(float)
+        # Early stopping leaves trailing zeros in the pre-allocated array.
+        # Replace them with NaN so semilogy ignores them and nanmean stays correct.
+        if curve[-1] == 0:
+            last = np.flatnonzero(curve)
+            if len(last):
+                curve[last[-1] + 1:] = np.nan
+        return curve
 
-        plt.figure(figsize=(10, 6))
+    def _plot_groups(ax, subset, group_by):
+        groups = {}
+        for r in subset:
+            groups.setdefault(r.get(group_by, 'unknown'), []).append(_load_curve(r))
         for k, curves in sorted(groups.items(), key=lambda x: (isinstance(x[0], str), x[0])):
-            plt.semilogy(np.mean(curves, axis=0), label=f'{group_by}={k}', linewidth=2)
+            ax.semilogy(np.nanmean(curves, axis=0), label=f'{group_by}={k}', linewidth=2)
+
+    if facet_by is None:
+        plt.figure(figsize=(10, 6))
+        _plot_groups(plt.gca(), results, group_by)
         plt.xlabel('Iteration')
         plt.ylabel('Loss')
         plt.title(title or f'Convergence by {group_by}')
@@ -122,11 +134,7 @@ def convergence_curves(results, group_by, output_dir, facet_by=None, title=None)
 
         for ax, facet_val in zip(axes, facets):
             subset = [r for r in results if r.get(facet_by) == facet_val]
-            groups = {}
-            for r in subset:
-                groups.setdefault(r.get(group_by, 'unknown'), []).append(r['loss'][0])
-            for k, curves in sorted(groups.items(), key=lambda x: (isinstance(x[0], str), x[0])):
-                ax.semilogy(np.mean(curves, axis=0), label=f'{group_by}={k}', linewidth=2)
+            _plot_groups(ax, subset, group_by)
             ax.set_title(f'{facet_by}={facet_val}')
             ax.set_xlabel('Iteration')
             ax.legend()

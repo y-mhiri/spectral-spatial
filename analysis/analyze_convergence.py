@@ -49,7 +49,7 @@ def main():
             subset,
             group_by='max_iter_cp',
             facet_by='algorithm',
-            output_dir=f'{output_dir}/cp_impact',
+            output_dir=f'{output_dir}/cp_impact/lambda_{lmbda}',
             title=f'CP iterations impact  (λ={lmbda})',
         )
 
@@ -63,7 +63,7 @@ def main():
             subset,
             group_by='lmbda',
             facet_by='algorithm',
-            output_dir=f'{output_dir}/lambda_impact',
+            output_dir=f'{output_dir}/lambda_impact/cp_{cp}',
             title=f'Regularization impact  (CP={cp} iters)',
         )
 
