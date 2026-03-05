@@ -18,6 +18,7 @@ output/
 data_config/
 venv/
 .env
+scripts/env.sh
 
 # IDE
 .idea/

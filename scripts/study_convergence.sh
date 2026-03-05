@@ -4,11 +4,16 @@
 #
 # Usage: DATASET_PATH=/path/to/data.zarr [DEVICE=cpu] ./scripts/study_convergence.sh
 
-if [ -z "$DATASET_PATH" ]; then
-    echo "ERROR: DATASET_PATH environment variable not set"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/env.sh"
+
+if [ ! -f "$ENV_FILE" ]; then
+    echo "ERROR: $ENV_FILE not found. Copy scripts/env.sh.example to scripts/env.sh and fill in your paths."
     exit 1
 fi
 
+# Allow overriding DATASET_PATH and DEVICE from the shell; env.sh sets defaults.
+source "$ENV_FILE"
 DEVICE=${DEVICE:-cuda}
 RESULTS_DIR="results/convergence_study_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RESULTS_DIR"
@@ -31,6 +36,7 @@ run_experiment() {
     echo "  Launching [$session]  log -> $logfile"
 
     screen -dmS "$session" bash -c "
+        source '$ENV_FILE' &&
         python experiments/experiment_simple.py \
             --algorithm     '$algorithm' \
             --dataset_path  '$DATASET_PATH' \
