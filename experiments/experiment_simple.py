@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from src.datasets.pandataset import PANDataset
 from src.algorithms.pan_ctv import PANCTV
 from src.algorithms.pan_ctv_grad_align import PANCTVGradAlignment
-from src.algorithms.nabla import nabla
+from src.algorithms.utils.nabla import nabla
 from src.metrics.metrics import compute_metrics
 from experiments.experiment_helpers import save_experiment_info, store_results, print_experiment_info
 

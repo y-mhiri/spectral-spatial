@@ -268,8 +268,8 @@ def visualize_gradalign(zarr_path, output_dir, rgb_indices=None, dataset_path=No
     gradients are aligned with the PAN structure.
     """
     import torch
-    from src.algorithms.nabla import nabla
-    from src.algorithms.prox_tv_grad_align import compute_alpha_from_pan
+    from src.algorithms.utils.nabla import nabla
+    from src.algorithms.prox.tv_grad_align import compute_alpha_from_pan
 
     visualize(zarr_path, output_dir, rgb_indices, dataset_path)
 

@@ -34,7 +34,7 @@ def SSIM(A,B):
 
 def compute_metrics(gt,est, numpy=False):
 
-    if numpy==True:
+    if numpy:
         return {'RNMSE': RNMSE(gt,est).cpu().numpy().tolist(),
                 'CC': CC(gt,est).cpu().numpy().tolist(),
                 'PSNR': PSNR(gt,est).cpu().numpy().tolist(),

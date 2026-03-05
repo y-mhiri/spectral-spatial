@@ -1,195 +1,136 @@
 """
-Defines a base class to implement Chambolle-Pock type algorithms. 
-
+Base class for Chambolle-Pock primal-dual algorithms.
 """
 import torch
 from torch import nn
 from math import sqrt
 
+
 class ChambollePock(nn.Module):
     """
-    Chambolle-Pock algorithm for solving the optimization problem:
-    min_u 1/2 ||Ku - y||^2 + lmbda * g(u)
-    where g is a convex function and K is a linear operator.
+    Chambolle-Pock algorithm solving:
+        min_u  f(u) + g(K u)
+    via the primal-dual iteration:
+        q_{n+1} = prox_{sigma g*}(q_n + sigma K v_n)
+        u_{n+1} = prox_{tau  f }(u_n - tau  K* q_{n+1})
+        v_{n+1} = u_{n+1} + theta (u_{n+1} - u_n)
 
-    The class inherits from nn.Module and uses torch tensors.
+    Subclasses must implement: K, K_adjoint, prox_sigma_g_conj, prox_tau_f, compute_L.
+    Optionally: loss_fn (for monitoring; returning 0 disables it).
 
     Attributes:
-    - max_iter: maximum number of iterations
-    - lmbda: regularization parameter
-    - theta: relaxation parameter
-    - sigma: step size for the primal variable u
-    - tau: step size for the dual variable
-
-    Methods:
-    - K: linear operator K
-    - K_adjoint: adjoint operator of K
-    - prox_sigma_g_conj: proximal operator of sigma * g^*
-    - prox_tau_f: proximal operator of tau * f
-    - compute_L: compute the Lipschitz constant of K
-    - loss_fn: loss function to be minimized
-    - forward: run the Chambolle-Pock algorithm
-
+        max_iter (int):   Maximum iterations.
+        lmbda (float):    Regularization weight (passed to prox_sigma_g_conj).
+        theta (float):    Relaxation parameter.
+        sigma, tau (float): Step sizes (scaled by 1/L in forward).
+        tol (float):      Convergence tolerance on relative primal change.
+        accelerate (bool): Enable accelerated variant (requires gamma).
     """
 
-    def __init__(self, max_iter=100, lmbda=1, theta=1, sigma=.99, tau=0.99, tol=1e-7, accelerate=False, gamma=None):
-        super(ChambollePock, self).__init__()
-        self.max_iter = max_iter
-        self.lmbda = lmbda
-        self.theta = theta
-        self.sigma = sigma
-        self.tau = tau
-        self.L = None
+    def __init__(self, max_iter=100, lmbda=1, theta=1, sigma=0.99, tau=0.99,
+                 tol=1e-7, accelerate=False, gamma=None):
+        super().__init__()
+        self.max_iter   = max_iter
+        self.lmbda      = lmbda
+        self.theta      = theta
+        self.sigma      = sigma
+        self.tau        = tau
+        self.tol        = tol
         self.accelerate = accelerate
-        self.gamma = gamma
-        self.tol = tol
+        self.gamma      = gamma
 
         if self.accelerate and self.gamma is None:
-            raise ValueError('gamma must be provided if accelerate is True')
+            raise ValueError('gamma must be provided when accelerate=True')
 
-
+    # ── abstract interface ────────────────────────────────────────────────────
 
     def K(self, u, **kwargs):
-        """
-            Define the linear operator associated to the primal dual formulation of the problem
-
-            Parameters:
-            - u: input tensor of shape (batch, channels, height, width)
-            - kwargs: additional parameters
-        """
-
+        """Linear operator K. Must be overridden."""
         pass
 
     def K_adjoint(self, q, **kwargs):
-        """
-            Define the adjoint operator associated to the primal dual formulation of the problem
-
-            Parameters:
-            - q: input tensor of shape (batch, height, width, 2)
-            - kwargs: additional parameters
-        """
+        """Adjoint K*. Must be overridden."""
         pass
 
-
     def prox_sigma_g_conj(self, q, sigma, **kwargs):
-        """
-            Define the proximal operator of sigma * g^*
-
-            Parameters:
-            - q: input tensor of shape (batch, height, width, 2)
-            - sigma: step size
-            - kwargs: additional parameters
-        """
+        """Proximal operator of sigma * g*. Must be overridden."""
         pass
 
     def prox_tau_f(self, u, tau, **kwargs):
-        """
-            Define the proximal operator of tau * f
-
-            Parameters:
-            - u: input tensor of shape (batch, channels, height, width)
-            - tau: step size
-            - kwargs: additional parameters
-        """
-
+        """Proximal operator of tau * f. Must be overridden."""
         pass
-
 
     def compute_L(self, **kwargs):
-        """
-            Compute the Lipschitz constant of K
-
-            Parameters:
-            - kwargs: additional parameters
-        """
+        """Lipschitz constant of K. Must be overridden."""
         pass
-    
+
     def loss_fn(self, u, y, lmbda, **kwargs):
-        """
-            Define the loss function to be minimized
-
-            Parameters:
-            - u: (estimate) input tensor of shape (batch, channels, height, width)
-            - y: (observation) input tensor of shape (batch, channels, height, width)
-            - lmbda: regularization parameter
-            - kwargs: additional parameters
-        """
+        """Objective value for monitoring. Return 0 to disable tracking."""
         pass
 
-    def forward(self, y, init=None, verbose=True, params=None, return_loss=True):
+    # ── algorithm ─────────────────────────────────────────────────────────────
+
+    def forward(self, y, init=None, verbose=False, params=None, return_loss=False):
         """
-            Solve the optimization problem using the Chambolle-Pock algorithm
+        Run Chambolle-Pock.
 
-            Parameters:
-            - y: input tensor of shape (batch, channels, height, width)
-            - init: initial estimate. If None, set to K^*y
-            - verbose: print the progress of the algorithm
-            - params: dictionary of additional parameters
+        Args:
+            y (torch.Tensor): Input / observation [b, c, h, w].
+            init:             Initial primal variable (defaults to y).
+            verbose (bool):   Print iteration info.
+            params (dict):    Per-method keyword arguments, keyed by method name.
+            return_loss (bool): If True, also return loss and rel arrays.
 
-            Returns:
-            - u: estimate of the solution
-            - loss: loss function at each iteration
-
+        Returns:
+            u                        if return_loss=False
+            (u, loss, rel)           if return_loss=True
         """
-
         if params is None:
             params = {}
 
-        b,c,h,w = y.shape
+        L     = self.compute_L(**params.get('compute_L', {}))
+        sigma = self.sigma / L
+        tau   = self.tau   / L
 
-        L = self.compute_L(**params['compute_L'])
-        sigma = self.sigma/L
-        tau = self.tau/L 
+        u = torch.clone(init if init is not None else y)
+        q = self.K(u, **params.get('K', {}))
+        v = torch.clone(u)
 
-
-        if init is not None:
-            u = torch.clone(init)
-        else:
-            u = torch.clone(y)
-
-        q = self.K(u, **params['K'])
-        v = torch.clone(u) 
-
-  
-        loss = torch.zeros(self.max_iter)
-        rel = torch.zeros(self.max_iter)
+        rel  = torch.zeros(self.max_iter, device=y.device)
+        loss = torch.zeros(self.max_iter, device=y.device) if return_loss else None
 
         if verbose:
-            print(f'Chambolle Pock algorithm starting...')
+            print('Chambolle-Pock starting...')
+
         for it in range(self.max_iter):
-            
             u_old = torch.clone(u)
 
-            q = self.prox_sigma_g_conj(q + sigma * self.K(v,**params['K']), sigma, **params['prox_sigma_g_conj'])
-            
-            u = self.prox_tau_f(u - tau * self.K_adjoint(q, **params['K_adjoint']), tau, **params['prox_tau_f'])
+            q = self.prox_sigma_g_conj(
+                    q + sigma * self.K(v, **params.get('K', {})),
+                    sigma, **params.get('prox_sigma_g_conj', {}))
+            u = self.prox_tau_f(
+                    u - tau * self.K_adjoint(q, **params.get('K_adjoint', {})),
+                    tau, **params.get('prox_tau_f', {}))
 
             if self.accelerate:
-                self.theta = 1/sqrt(1 + 2 * self.gamma * tau)
-                tau = self.gamma * self.theta
+                self.theta = 1 / sqrt(1 + 2 * self.gamma * tau)
+                tau   = self.gamma * self.theta
                 sigma = sigma / self.theta
 
             v = u + self.theta * (u - u_old)
 
-      
-            loss[it] = self.loss_fn(u, y, self.lmbda, **params['loss_fn'])
-            rel[it] = torch.norm(u - u_old)/torch.norm(u_old)
-
+            rel[it] = torch.norm(u - u_old) / torch.norm(u_old)
+            if return_loss:
+                loss[it] = self.loss_fn(u, y, self.lmbda, **params.get('loss_fn', {}))
 
             if verbose:
-                print('[Chambolle-Pock] Iteration: ', it, 'relative variation: ', torch.norm(u - u_old)/torch.norm(u_old))
+                print(f'[CP] it={it:4d}  rel={rel[it].item():.3e}')
 
-                print('[Chambolle-Pock] Cost function: ', loss[it])
-
-            
             if rel[it] < self.tol:
-                print(f'[Chambolle-Pock] Converged after {it+1} iterations.')
+                if verbose:
+                    print(f'[CP] Converged after {it + 1} iterations.')
                 break
 
         if return_loss:
             return u, loss, rel
-        else:
-            return u
-        
-
-    
+        return u
