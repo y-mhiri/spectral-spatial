@@ -280,19 +280,20 @@ def visualize(zarr_path, output_dir, rgb_indices=None, dataset_path=None):
         _print_metrics(results, algorithm)
         return
 
-    import torch
     dataset = _load_dataset(results, dataset_path)
+    rgb_indices = dataset.rgb_index if rgb_indices is None else rgb_indices
+
     X = dataset[0].unsqueeze(0)
     original     = np.transpose(zarr.open(dataset_path, mode='r')['train/0'][:], (2, 0, 1))
-    Y_H          = dataset.simulate_low_res_hsi(X, noise=False).squeeze(0).cpu().numpy()
-    Y_M          = dataset.simulate_panchromatic(X, noise=False).squeeze(0).cpu().numpy()
+    Y_H          = dataset.simulate_low_res_hsi(X, noise=True).squeeze(0).cpu().numpy()
+    Y_M          = dataset.simulate_panchromatic(X, noise=True).squeeze(0).cpu().numpy()
     pan_norm     = (Y_M[0] - Y_M[0].min()) / (Y_M[0].max() - Y_M[0].min() + 1e-8)
 
     # Inputs: GT | LR HSI | PAN
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
     axes[0].imshow(_to_rgb(original, rgb_indices)); axes[0].set_title('Ground truth');       axes[0].axis('off')
-    axes[1].imshow(_to_rgb(Y_H, rgb_indices));      axes[1].set_title('LR HSI (noiseless)'); axes[1].axis('off')
-    axes[2].imshow(pan_norm, cmap='gray');           axes[2].set_title('Panchromatic');       axes[2].axis('off')
+    axes[1].imshow(_to_rgb(Y_H, rgb_indices));      axes[1].set_title('LR HSI (noisy)'); axes[1].axis('off')
+    axes[2].imshow(pan_norm, cmap='gray');           axes[2].set_title('Panchromatic (noisy)');       axes[2].axis('off')
     plt.suptitle(algorithm)
     _save(f'{output_dir}/inputs.png')
 
@@ -357,7 +358,7 @@ def visualize_gradalign(zarr_path, output_dir, rgb_indices=None, dataset_path=No
     im = plt.imshow(c, cmap='viridis')
     plt.colorbar(im, fraction=0.046, pad=0.04)
     plt.contour(c, levels=[alpha], colors='red', linewidths=1)
-    plt.title(f'GradAlign criterion c(x,y)   α = {alpha:.2e} (Otsu)')
+    plt.title(f'GradAlign criterion c(x,y)   $\\alpha$ = {alpha:.2e} (Otsu)')
     plt.axis('off')
     _save(f'{output_dir}/gradalign_criterion.png')
 
@@ -367,7 +368,7 @@ def visualize_gradalign(zarr_path, output_dir, rgb_indices=None, dataset_path=No
     axes[0].set_title('Panchromatic'); axes[0].axis('off')
     axes[1].imshow(pan_norm, cmap='gray')
     axes[1].imshow(c >= alpha, alpha=0.45, cmap='Reds')
-    axes[1].set_title(f'Alignment mask  (α = {alpha:.2e})'); axes[1].axis('off')
+    axes[1].set_title(f'Alignment mask  ($\\alpha$ = {alpha:.2e})'); axes[1].axis('off')
     plt.suptitle('GradAlign — edge alignment regions')
     _save(f'{output_dir}/gradalign_mask.png')
 
