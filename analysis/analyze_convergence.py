@@ -43,13 +43,17 @@ def main():
 
     # Q1: Does CP iteration count affect convergence?
     # Lines = CP values, averaged over λ → marginal effect of inner solver.
-    convergence_curves(results, group_by='max_iter_cp', facet_by='algorithm',
-                       output_dir=output_dir, title='CP iterations impact')
+    for mode in ('loss', 'distance', 'relval'):
+        convergence_curves(results, group_by='max_iter_cp', facet_by='algorithm',
+                           output_dir=output_dir, mode=mode,
+                           title='CP iterations impact')
 
     # Q2: Does λ affect convergence?
     # Lines = λ values, averaged over CP → marginal effect of regularization.
-    convergence_curves(results, group_by='lmbda', facet_by='algorithm',
-                       output_dir=output_dir, title='Regularization impact')
+    for mode in ('loss', 'distance', 'relval'):
+        convergence_curves(results, group_by='lmbda', facet_by='algorithm',
+                           output_dir=output_dir, mode=mode,
+                           title='Regularization impact')
 
     # Q3: Which algorithm performs better across all conditions?
     ctv = [r for r in results if r.get('algorithm') == 'CTV']

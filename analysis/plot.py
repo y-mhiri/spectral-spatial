@@ -80,6 +80,44 @@ def _loss_curve(loss_array, idx=0):
     return curve
 
 
+def _distance_curve(loss_array, idx=0):
+    """loss - loss_final: distance to apparent optimum. Values <= 0 masked (avoids log(0))."""
+    curve = _loss_curve(loss_array, idx)
+    valid = curve[~np.isnan(curve)]
+    if len(valid) == 0:
+        return curve
+    dist = curve - valid[-1]          # subtract last non-NaN value (where algorithm stopped)
+    dist[dist <= 0] = np.nan
+    return dist
+
+
+def _relval_curve(relval_array, idx=0):
+    """Relative variation ||U_{k+1} - U_k|| / ||U_k||, trailing zeros masked."""
+    curve = relval_array[idx].astype(float)
+    if curve[-1] == 0:
+        last = np.flatnonzero(curve)
+        if len(last):
+            curve[last[-1] + 1:] = np.nan
+    return curve
+
+
+def _add_zoom_inset(ax, zoom_tail):
+    """Add a top-right inset showing the last zoom_tail fraction of all lines on ax."""
+    lines = [l for l in ax.get_lines() if len(l.get_xdata()) > 0]
+    if not lines:
+        return
+    n = len(lines[0].get_ydata())
+    start = int(n * (1 - zoom_tail))
+    axins = ax.inset_axes([0.45, 0.45, 0.52, 0.52])
+    for line in lines:
+        x, y = line.get_xdata(), line.get_ydata()
+        axins.semilogy(x[start:], y[start:],
+                       color=line.get_color(), linewidth=line.get_linewidth())
+    axins.grid(True, alpha=0.3)
+    axins.tick_params(labelsize=7)
+    axins.set_title(f'last {int(zoom_tail * 100)}%', fontsize=8)
+
+
 # ── cross-experiment plots ────────────────────────────────────────────────────
 
 def metric_vs_param(results, param, metric_name, output_dir, title=None):
@@ -104,38 +142,54 @@ def metric_vs_param(results, param, metric_name, output_dir, title=None):
     _save(f'{output_dir}/{metric_name}_vs_{param}.png')
 
 
-def convergence_curves(results, group_by, output_dir, facet_by=None, title=None):
-    """Plot mean loss curves grouped by a parameter (semilogy).
+_CURVE_MODES = {
+    'loss':     ('Loss',              lambda r: _loss_curve(r['loss'])),
+    'distance': ('Loss \u2212 final', lambda r: _distance_curve(r['loss'])),
+    'relval':   ('Relative variation',lambda r: _relval_curve(r['relval'])),
+}
 
-    facet_by: optional second parameter that creates a subplot per value.
+
+def convergence_curves(results, group_by, output_dir, facet_by=None, title=None,
+                       mode='loss', burn_in=0, zoom_tail=None):
+    """Plot convergence curves grouped by a parameter (semilog-y).
+
+    Args:
+        mode (str):        'loss' | 'distance' (loss−final) | 'relval' (relative variation).
+        burn_in (int):     Skip the first burn_in iterations (common identical descent phase).
+        zoom_tail (float): If set (e.g. 0.3), add an inset showing the last 30% of iterations.
+        facet_by (str):    Optional second parameter creating one subplot per value.
 
     Examples:
-        # single panel — lines by lambda
-        convergence_curves(results, group_by='lmbda', output_dir='figs/')
-
-        # faceted — one panel per algorithm, lines by CP iterations
+        convergence_curves(results, group_by='lmbda', output_dir='figs/', mode='distance')
+        convergence_curves(results, group_by='lmbda', output_dir='figs/', mode='relval', zoom_tail=0.3)
         subset = filter_results(results, lmbda=0.001)
-        convergence_curves(subset, group_by='max_iter_cp', facet_by='algorithm', output_dir='figs/')
+        convergence_curves(subset, group_by='max_iter_cp', facet_by='algorithm',
+                           output_dir='figs/', mode='distance', burn_in=10)
     """
-    def _load_curve(r):
-        return _loss_curve(r['loss'])
+    ylabel, load_curve = _CURVE_MODES[mode]
 
     def _plot_groups(ax, subset, group_by):
         groups = {}
         for r in subset:
-            groups.setdefault(r.get(group_by, 'unknown'), []).append(_load_curve(r))
+            groups.setdefault(r.get(group_by, 'unknown'), []).append(load_curve(r))
         for k, curves in sorted(groups.items(), key=lambda x: (isinstance(x[0], str), x[0])):
-            ax.semilogy(np.nanmean(curves, axis=0), label=f'{group_by}={k}', linewidth=2)
+            mean = np.nanmean(curves, axis=0)[burn_in:]
+            iters = np.arange(burn_in, burn_in + len(mean))
+            ax.semilogy(iters, mean, label=f'{group_by}={k}', linewidth=2)
+        if zoom_tail is not None:
+            _add_zoom_inset(ax, zoom_tail)
+
+    prefix = '' if mode == 'loss' else f'{mode}_'
 
     if facet_by is None:
         plt.figure(figsize=(10, 6))
         _plot_groups(plt.gca(), results, group_by)
         plt.xlabel('Iteration')
-        plt.ylabel('Loss')
-        plt.title(title or f'Convergence by {group_by}')
+        plt.ylabel(ylabel)
+        plt.title(title or f'Convergence ({mode}) by {group_by}')
         plt.legend()
         plt.grid(True, alpha=0.3)
-        _save(f'{output_dir}/convergence_by_{group_by}.png')
+        _save(f'{output_dir}/{prefix}convergence_by_{group_by}.png')
     else:
         facets = sorted(set(r.get(facet_by, 'unknown') for r in results),
                         key=lambda x: (isinstance(x, str), x))
@@ -151,9 +205,9 @@ def convergence_curves(results, group_by, output_dir, facet_by=None, title=None)
             ax.legend()
             ax.grid(True, alpha=0.3)
 
-        axes[0].set_ylabel('Loss')
-        fig.suptitle(title or f'Convergence by {group_by}, faceted by {facet_by}')
-        _save(f'{output_dir}/convergence_{group_by}_by_{facet_by}.png')
+        axes[0].set_ylabel(ylabel)
+        fig.suptitle(title or f'Convergence ({mode}) by {group_by}, faceted by {facet_by}')
+        _save(f'{output_dir}/{prefix}convergence_{group_by}_by_{facet_by}.png')
 
 
 def compare_algorithms(results_by_alg, metric_name, output_dir, title=None):
@@ -201,16 +255,23 @@ def visualize(zarr_path, output_dir, rgb_indices=None, dataset_path=None):
     root = zarr.open(zarr_path, mode='r')
     results = dict(root.attrs)
     results['reconstructed'] = root['reconstructed'][:]
-    results['loss'] = root['loss'][:]
+    results['loss']   = root['loss'][:]
+    results['relval'] = root['relval'][:]
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     algorithm = results.get('algorithm', 'Algorithm')
 
-    # Convergence — single sample (image 0), early-stopping zeros masked
-    loss = _loss_curve(results['loss'])
-    plt.figure(figsize=(8, 5))
-    plt.semilogy(loss)
-    plt.xlabel('Iteration'); plt.ylabel('Loss')
-    plt.title(f'{algorithm} — Convergence'); plt.grid(True, alpha=0.3)
+    # Convergence — 3 panels: loss | loss−final | relval (semilog-y, image 0)
+    loss_c = _loss_curve(results['loss'])
+    dist_c = _distance_curve(results['loss'])
+    relv_c = _relval_curve(results['relval'])
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    for ax, curve, label in zip(axes,
+                                 [loss_c,   dist_c,           relv_c],
+                                 ['Loss', 'Loss \u2212 final', 'Relative variation']):
+        ax.semilogy(curve)
+        ax.set_xlabel('Iteration'); ax.set_ylabel(label)
+        ax.set_title(label); ax.grid(True, alpha=0.3)
+    fig.suptitle(f'{algorithm} — Convergence')
     _save(f'{output_dir}/convergence.png')
 
     dataset_path = dataset_path or results.get('dataset_path')
@@ -219,19 +280,20 @@ def visualize(zarr_path, output_dir, rgb_indices=None, dataset_path=None):
         _print_metrics(results, algorithm)
         return
 
-    import torch
     dataset = _load_dataset(results, dataset_path)
+    rgb_indices = dataset.rgb_index if rgb_indices is None else rgb_indices
+
     X = dataset[0].unsqueeze(0)
     original     = np.transpose(zarr.open(dataset_path, mode='r')['train/0'][:], (2, 0, 1))
-    Y_H          = dataset.simulate_low_res_hsi(X, noise=False).squeeze(0).cpu().numpy()
-    Y_M          = dataset.simulate_panchromatic(X, noise=False).squeeze(0).cpu().numpy()
+    Y_H          = dataset.simulate_low_res_hsi(X, noise=True).squeeze(0).cpu().numpy()
+    Y_M          = dataset.simulate_panchromatic(X, noise=True).squeeze(0).cpu().numpy()
     pan_norm     = (Y_M[0] - Y_M[0].min()) / (Y_M[0].max() - Y_M[0].min() + 1e-8)
 
     # Inputs: GT | LR HSI | PAN
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
     axes[0].imshow(_to_rgb(original, rgb_indices)); axes[0].set_title('Ground truth');       axes[0].axis('off')
-    axes[1].imshow(_to_rgb(Y_H, rgb_indices));      axes[1].set_title('LR HSI (noiseless)'); axes[1].axis('off')
-    axes[2].imshow(pan_norm, cmap='gray');           axes[2].set_title('Panchromatic');       axes[2].axis('off')
+    axes[1].imshow(_to_rgb(Y_H, rgb_indices));      axes[1].set_title('LR HSI (noisy)'); axes[1].axis('off')
+    axes[2].imshow(pan_norm, cmap='gray');           axes[2].set_title('Panchromatic (noisy)');       axes[2].axis('off')
     plt.suptitle(algorithm)
     _save(f'{output_dir}/inputs.png')
 
@@ -296,7 +358,7 @@ def visualize_gradalign(zarr_path, output_dir, rgb_indices=None, dataset_path=No
     im = plt.imshow(c, cmap='viridis')
     plt.colorbar(im, fraction=0.046, pad=0.04)
     plt.contour(c, levels=[alpha], colors='red', linewidths=1)
-    plt.title(f'GradAlign criterion c(x,y)   α = {alpha:.2e} (Otsu)')
+    plt.title(f'GradAlign criterion c(x,y)   $\\alpha$ = {alpha:.2e} (Otsu)')
     plt.axis('off')
     _save(f'{output_dir}/gradalign_criterion.png')
 
@@ -306,7 +368,7 @@ def visualize_gradalign(zarr_path, output_dir, rgb_indices=None, dataset_path=No
     axes[0].set_title('Panchromatic'); axes[0].axis('off')
     axes[1].imshow(pan_norm, cmap='gray')
     axes[1].imshow(c >= alpha, alpha=0.45, cmap='Reds')
-    axes[1].set_title(f'Alignment mask  (α = {alpha:.2e})'); axes[1].axis('off')
+    axes[1].set_title(f'Alignment mask  ($\\alpha$ = {alpha:.2e})'); axes[1].axis('off')
     plt.suptitle('GradAlign — edge alignment regions')
     _save(f'{output_dir}/gradalign_mask.png')
 
