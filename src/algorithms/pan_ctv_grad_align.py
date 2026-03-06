@@ -21,12 +21,12 @@ class PANCTVGradAlignment(PANProximalGradient):
         init_params['p'] = self.p
         init_params['q'] = self.q
         init_params['r'] = self.r
-        self.optim = TVGradAlignment(**init_params)
+        self.prox_solver = TVGradAlignment(**init_params)
 
     def proxg(self, x, gamma=1):
         """Proximal operator of the gradient-aligned CTV prior, solved by Chambolle-Pock."""
         params = {'prox_tau_f': {'y': x, 'sigma2': 1}}
-        return self.optim(x, init=None, verbose=False, params=params, return_loss=False)
+        return self.prox_solver(x, init=None, verbose=False, params=params, return_loss=False)
 
     def compute_cost(self, U, Y_H, Y_M):
         """
@@ -42,6 +42,6 @@ class PANCTVGradAlignment(PANProximalGradient):
         """
         data_term_h = 0.5 * torch.norm(self.A(U) - Y_H) ** 2
         data_term_m = 0.5 * self.lmbda_m * torch.norm(self.spectral_op(U) - Y_M) ** 2
-        grad_U      = torch.matmul(self.optim.W, nabla(U).unsqueeze(-1)).squeeze(-1)
+        grad_U      = torch.matmul(self.prox_solver.W, nabla(U).unsqueeze(-1)).squeeze(-1)
         tv_term     = self.lmbda * self.ctv_norm(grad_U, eps=1e-8)
         return data_term_h + data_term_m + tv_term, data_term_h, data_term_m, tv_term

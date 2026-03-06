@@ -18,12 +18,12 @@ class PANCTV(PANProximalGradient):
         init_params['p'] = self.p
         init_params['q'] = self.q
         init_params['r'] = self.r
-        self.optim = TVPrior(**init_params)
+        self.prox_solver = TVPrior(**init_params)
 
     def proxg(self, x, gamma=1):
         """Proximal operator of the CTV prior, solved by Chambolle-Pock."""
         params = {'prox_tau_f': {'y': x, 'sigma2': 1}}
-        return self.optim(x, init=None, verbose=False, params=params, return_loss=False)
+        return self.prox_solver(x, init=None, verbose=False, params=params, return_loss=False)
 
     def compute_cost(self, U, Y_H, Y_M):
         """
