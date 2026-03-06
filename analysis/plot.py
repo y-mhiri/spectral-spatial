@@ -362,15 +362,20 @@ def visualize_gradalign(zarr_path, output_dir, rgb_indices=None, dataset_path=No
     plt.axis('off')
     _save(f'{output_dir}/gradalign_criterion.png')
 
-    # Alignment mask overlaid on PAN
+    # Soft gradient-direction weight: w(x,y) = 1 - sigmoid((c - alpha) / tau)
+    # w ≈ 1 where c << alpha (non-edge, full TV penalty)
+    # w ≈ 0 where c >> alpha (strong PAN edge, penalty suppressed)
+    tau = float(results.get('threshold_softness', 1.0))
+    w   = 1.0 / (1.0 + np.exp((c - alpha) / tau))
+
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     axes[0].imshow(pan_norm, cmap='gray')
     axes[0].set_title('Panchromatic'); axes[0].axis('off')
-    axes[1].imshow(pan_norm, cmap='gray')
-    axes[1].imshow(c >= alpha, alpha=0.45, cmap='Reds')
-    axes[1].set_title(f'Alignment mask  ($\\alpha$ = {alpha:.2e})'); axes[1].axis('off')
-    plt.suptitle('GradAlign — edge alignment regions')
-    _save(f'{output_dir}/gradalign_mask.png')
+    im = axes[1].imshow(w, cmap='RdYlGn', vmin=0, vmax=1)
+    plt.colorbar(im, ax=axes[1], fraction=0.046, pad=0.04)
+    axes[1].set_title('Gradient-direction weight  w(x,y)'); axes[1].axis('off')
+    plt.suptitle(f'GradAlign — soft penalty weights  ($\\alpha$ = {alpha:.2e},  $\\tau$ = {tau:.2g})')
+    _save(f'{output_dir}/gradalign_weights.png')
 
 
 if __name__ == '__main__':
