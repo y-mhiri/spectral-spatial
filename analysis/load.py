@@ -1,6 +1,7 @@
 """Load experiment results for analysis."""
 import zarr
 from glob import glob
+import numpy as np
 
 
 def load_results(study_dir):
@@ -46,6 +47,41 @@ def to_dataframe(results):
     ARRAY_KEYS = {'reconstructed', 'loss', 'relval', 'zarr_path'}
     rows = [{k: v for k, v in r.items() if k not in ARRAY_KEYS} for r in results]
     return pd.DataFrame(rows)
+
+
+def load_scene(result, image_idx=0):
+    """Load GT, noisy LR HSI, and noisy PAN for one image from the stored dataset.
+
+    Args:
+        result:    one entry from load_results() — needs 'dataset_path' and degradation params.
+        image_idx: which training image to load (default 0).
+
+    Returns dict with numpy arrays:
+        gt  [C, H, W]  — ground truth hyperspectral image
+        yh  [C, h, w]  — noisy low-resolution HSI  (h = H // scale)
+        ym  [1, H, W]  — noisy panchromatic image
+
+    Example:
+        scene = load_scene(result)
+        sanity_check(result, scene, output_dir='figs/')
+    """
+    import torch
+    import zarr as _zarr
+    from src.datasets.pandataset import PANDataset
+
+    dataset_path = result['dataset_path']
+    dataset = PANDataset(
+        root_dir=dataset_path, split='train', normalize=True,
+        scale=int(result.get('scale', 4)),
+        sigma_blur=float(result.get('sigma_blur', 1.0)),
+        noise_level=float(result.get('noise_level', 40)),
+        device='cpu', seed=int(result.get('seed', 42))
+    )
+    X  = dataset[image_idx].unsqueeze(0)
+    gt = np.transpose(_zarr.open(dataset_path, mode='r')[f'train/{image_idx}'][:], (2, 0, 1))
+    yh = dataset.simulate_low_res_hsi(X, noise=True).squeeze(0).numpy()
+    ym = dataset.simulate_panchromatic(X, noise=True).squeeze(0).numpy()
+    return {'gt': gt, 'yh': yh, 'ym': ym}
 
 
 def metric(result, name):
