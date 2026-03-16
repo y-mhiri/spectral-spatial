@@ -48,14 +48,21 @@ except ImportError:
     from analysis.load import metric as get_metric, filter_results
 
 
+# Set to False in a notebook to display figures inline instead of saving to disk.
+SAVE_FIGURES = True
+
+
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _save(path):
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
     plt.tight_layout()
-    plt.savefig(path, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f'Saved: {path}')
+    if SAVE_FIGURES:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(path, dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f'Saved: {path}')
+    else:
+        plt.show()
 
 
 def _to_rgb(image, rgb_indices):

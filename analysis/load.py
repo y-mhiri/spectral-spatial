@@ -18,7 +18,7 @@ def load_results(study_dir):
     results = []
     for f in files:
         root = zarr.open(f, mode='r')
-        data = {'reconstructed': root['reconstructed'][:], 'loss': root['loss'][:], 'relval': root['relval'][:]}
+        data = {'zarr_path': f, 'reconstructed': root['reconstructed'][:], 'loss': root['loss'][:], 'relval': root['relval'][:]}
         data.update(dict(root.attrs))
         results.append(data)
     print(f"Loaded {len(results)} experiments from {study_dir}")
@@ -43,7 +43,7 @@ def to_dataframe(results):
         df[['algorithm', 'lmbda', 'PSNR_mean']].sort_values('PSNR_mean', ascending=False)
     """
     import pandas as pd
-    ARRAY_KEYS = {'reconstructed', 'loss', 'relval'}
+    ARRAY_KEYS = {'reconstructed', 'loss', 'relval', 'zarr_path'}
     rows = [{k: v for k, v in r.items() if k not in ARRAY_KEYS} for r in results]
     return pd.DataFrame(rows)
 
