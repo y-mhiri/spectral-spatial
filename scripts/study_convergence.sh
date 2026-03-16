@@ -18,6 +18,10 @@ DEVICE=${DEVICE:-cuda}
 RESULTS_DIR="results/convergence_study_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RESULTS_DIR"
 
+SCRIPT_NAME=$(basename "$0")   
+
+cp $SCRIPT_DIR/$SCRIPT_NAME $RESULTS_DIR/$SCRIPT_NAME
+
 echo "Starting convergence study"
 echo "Dataset: $DATASET_PATH"
 echo "Device:  $DEVICE"
@@ -26,10 +30,9 @@ echo ""
 
 run_experiment() {
     local algorithm=$1
-    local lmbda=$2
-    local max_iter_cp=$3
-    local output_dir="$RESULTS_DIR/${algorithm}_lambda${lmbda}_cp${max_iter_cp}"
-    local session="${algorithm}_l${lmbda}_cp${max_iter_cp}"
+    local max_iter_cp=$2
+    local output_dir="$RESULTS_DIR/${algorithm}_cp${max_iter_cp}"
+    local session="${algorithm}_cp${max_iter_cp}"
     local logfile="$output_dir/run.log"
 
     mkdir -p "$output_dir"
@@ -41,7 +44,7 @@ run_experiment() {
             --algorithm     '$algorithm' \
             --dataset_path  '$DATASET_PATH' \
             --storage_path  '$output_dir' \
-            --lmbda         '$lmbda' \
+            --lmbda         0.001 \
             --lmbda_m       1.0 \
             --p 2.0 --q 2.0 --r 1.0 \
             --max_iter      10000 \
@@ -54,12 +57,10 @@ run_experiment() {
     "
 }
 
-for lmbda in 0.00001 0.0001 0.001 0.01; do
     for cp_iter in 10 50 100; do
-        run_experiment "CTV"       "$lmbda" "$cp_iter"
-        run_experiment "GradAlign" "$lmbda" "$cp_iter"
+        run_experiment "CTV"        "$cp_iter"
+        run_experiment "GradAlign"  "$cp_iter"
     done
-done
 
 echo ""
 echo "All sessions launched. Monitor with:  screen -ls"
