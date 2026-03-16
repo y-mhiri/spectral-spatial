@@ -34,6 +34,20 @@ def filter_results(results, **conditions):
     return [r for r in results if all(r.get(k) == v for k, v in conditions.items())]
 
 
+def to_dataframe(results):
+    """Convert load_results() output to a pandas DataFrame, dropping large arrays.
+
+    Example:
+        results = load_results("results/aggregate")
+        df = to_dataframe(results)
+        df[['algorithm', 'lmbda', 'PSNR_mean']].sort_values('PSNR_mean', ascending=False)
+    """
+    import pandas as pd
+    ARRAY_KEYS = {'reconstructed', 'loss', 'relval'}
+    rows = [{k: v for k, v in r.items() if k not in ARRAY_KEYS} for r in results]
+    return pd.DataFrame(rows)
+
+
 def metric(result, name):
     """
     Extract a scalar metric value from a result dict.
