@@ -338,6 +338,17 @@ def sam_map(recon, gt, output_dir='.', title='SAM (degrees)'):
     _save(f'{output_dir}/sam_map.png')
     return sam
 
+def show_pixel(image, pixel_yx, output_dir, rgb_indices=None, title=''):
+    """Show an image with the inspected pixel marked."""
+    
+    y, x = pixel_yx
+    plt.figure(figsize=(5, 5))
+    plt.imshow(_to_rgb(image, rgb_indices))
+    plt.plot(x, y, 'r+', markersize=15, markeredgewidth=2)  # note: imshow is (col, row)
+    plt.title(title or f'pixel ({y}, {x})')
+    plt.axis('off')
+    _save(f'{output_dir}/pixel_{y}_{x}.png')
+
 
 def spectral_profile(pixel_yx, gt, output_dir='.', **reconstructions):
     """Spectral profiles at one pixel for GT and any number of reconstructions.

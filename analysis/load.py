@@ -77,11 +77,12 @@ def load_scene(result, image_idx=0):
         noise_level=float(result.get('noise_level', 40)),
         device='cpu', seed=int(result.get('seed', 42))
     )
-    X  = dataset[image_idx].unsqueeze(0)
-    gt = np.transpose(_zarr.open(dataset_path, mode='r')[f'train/{image_idx}'][:], (2, 0, 1))
+    gt  = dataset[image_idx]
+    X = gt.unsqueeze(0)
+    # gt = np.transpose(_zarr.open(dataset_path, mode='r')[f'train/{image_idx}'][:], (2, 0, 1))
     yh = dataset.simulate_low_res_hsi(X, noise=True).squeeze(0).numpy()
     ym = dataset.simulate_panchromatic(X, noise=True).squeeze(0).numpy()
-    return {'gt': gt, 'yh': yh, 'ym': ym}
+    return {'gt': gt.numpy(), 'yh': yh, 'ym': ym}, dataset.rgb_index
 
 
 def metric(result, name):

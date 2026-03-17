@@ -30,11 +30,10 @@ echo ""
 
 run_experiment() {
     local algorithm=$1
-    local noise_level=$2
-    local sigma_blur=$3
-    local softness=$4
-    local output_dir="$RESULTS_DIR/${algorithm}_noise${noise_level}_blur${sigma_blur}_softness${softness}"
-    local session="${algorithm}_noise${noise_level}_blur${sigma_blur}_softness${softness}"
+    local lmbda=$2
+    local lmbda_m=$3
+    local output_dir="$RESULTS_DIR/${algorithm}_lmbda${lmbda}_lmbdaM${lmbda_m}"
+    local session="${algorithm}_lmbda${lmbda}_lmbdaM${lmbda_m}"
     local logfile="$output_dir/run.log"
 
     mkdir -p "$output_dir"
@@ -46,15 +45,15 @@ run_experiment() {
             --algorithm     '$algorithm' \
             --dataset_path  '$DATASET_PATH' \
             --storage_path  '$output_dir' \
-            --lmbda         0.001 \
-            --lmbda_m       0.0 \
+            --lmbda         $lmbda \
+            --lmbda_m       $lmbda_m \
             --p 2.0 --q 2.0 --r 1.0 \
             --max_iter      5000 \
             --max_iter_cp   10 \
             --tol           1e-8 \
-            --noise_level   '$noise_level' \
-            --sigma_blur    '$sigma_blur' \
-            --threshold_softness '$softness' \
+            --noise_level   37 \
+            --sigma_blur    8.0 \
+            --threshold_softness 1.0e-5 \
             --scale         4 \
             --device        '$DEVICE' \
         > '$logfile' 2>&1
@@ -62,18 +61,14 @@ run_experiment() {
 }
 
 
-for blur in 8.0; do
-    for noise_db in 37; do
-        run_experiment "CTV"       "$noise_db" "$blur" "1.0e-5"
-        for softness in 1.0e-5 5.0e-5 1.0e-4; do
-            run_experiment "GradAlign" "$noise_db" "$blur" "$softness"
-        done
-    done
+for lmbda in 0.001 0.01 0.1; do
+    for lmbda_m in 0.0 0.01 1.0; do
+        run_experiment "CTV"       "$lmbda" "$lmbda_m"
+        run_experiment "GradAlign" "$lmbda" "$lmbda_m"
+    done    
 done
 
 echo ""
 echo "All sessions launched. Monitor with:  screen -ls"
 echo "Follow a run with:  tail -f $RESULTS_DIR/<run>/run.log"
 echo ""
-echo "Analyze with:"
-echo "  python analysis/analyze.py --study_dir $RESULTS_DIR --group_by noise_level"
