@@ -340,7 +340,6 @@ def sam_map(recon, gt, output_dir='.', title='SAM (degrees)'):
 
 def show_pixel(image, pixel_yx, output_dir, rgb_indices=None, title=''):
     """Show an image with the inspected pixel marked."""
-    
     y, x = pixel_yx
     plt.figure(figsize=(5, 5))
     plt.imshow(_to_rgb(image, rgb_indices))
@@ -350,27 +349,62 @@ def show_pixel(image, pixel_yx, output_dir, rgb_indices=None, title=''):
     _save(f'{output_dir}/pixel_{y}_{x}.png')
 
 
-def spectral_profile(pixel_yx, gt, output_dir='.', **reconstructions):
-    """Spectral profiles at one pixel for GT and any number of reconstructions.
+def show_region(image, region_yx, output_dir='.', rgb_indices=None, title=''):
+    """Show an image with the inspected region outlined.
 
     Args:
-        pixel_yx:          (y, x) pixel coordinates
+        image:      [C, H, W]
+        region_yx:  (ymin, ymax, xmin, xmax)
+
+    Example:
+        show_region(scene['gt'], (100, 130, 70, 100), output_dir='figs/')
+    """
+    import matplotlib.patches as patches
+    ymin, ymax, xmin, xmax = region_yx
+    plt.figure(figsize=(5, 5))
+    plt.imshow(_to_rgb(image, rgb_indices))
+    rect = patches.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
+                              linewidth=2, edgecolor='red', facecolor='none')
+    plt.gca().add_patch(rect)
+    plt.title(title or f'y=[{ymin}:{ymax}]  x=[{xmin}:{xmax}]')
+    plt.axis('off')
+    _save(f'{output_dir}/region_{ymin}_{ymax}_{xmin}_{xmax}.png')
+
+
+def spectral_profile(region_yx, gt, output_dir='.', **reconstructions):
+    """Mean ± 1σ spectral profiles over a spatial region.
+
+    Args:
+        region_yx:         (ymin, ymax, xmin, xmax)
         gt:                [C, H, W] ground truth
         **reconstructions: name=array pairs, each [C, H, W]
 
     Example:
-        spectral_profile((120, 80), scene['gt'], output_dir='figs/',
+        spectral_profile((100, 130, 70, 100), scene['gt'], output_dir='figs/',
                          CTV=r_ctv['reconstructed'][0],
                          GradAlign=r_ga['reconstructed'][0])
     """
-    y, x = pixel_yx
+    ymin, ymax, xmin, xmax = region_yx
+
+    def _stats(arr):
+        patch = arr[:, ymin:ymax, xmin:xmax].reshape(arr.shape[0], -1)  # [C, N]
+        return patch.mean(axis=1), patch.std(axis=1)
+
+    bands = np.arange(gt.shape[0])
     plt.figure(figsize=(10, 4))
-    plt.plot(gt[:, y, x], 'k-', linewidth=2, label='GT')
+
+    mean, std = _stats(gt)
+    plt.plot(bands, mean, 'k-', linewidth=2, label='GT')
+    plt.fill_between(bands, mean - std, mean + std, alpha=0.15, color='k')
+
     for name, recon in reconstructions.items():
-        plt.plot(recon[:, y, x], '--', linewidth=1.5, label=name)
+        mean, std = _stats(recon)
+        line, = plt.plot(bands, mean, '--', linewidth=1.5, label=name)
+        plt.fill_between(bands, mean - std, mean + std, alpha=0.15, color=line.get_color())
+
     plt.xlabel('Band index'); plt.ylabel('Intensity')
-    plt.title(f'Spectral profile at pixel ({y}, {x})')
+    plt.title(f'Spectral profile  y=[{ymin}:{ymax}]  x=[{xmin}:{xmax}]')
     plt.legend(); plt.grid(True, alpha=0.3)
-    _save(f'{output_dir}/spectral_profile_{y}_{x}.png')
+    _save(f'{output_dir}/spectral_profile_{ymin}_{ymax}_{xmin}_{xmax}.png')
 
 
