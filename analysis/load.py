@@ -13,7 +13,7 @@ def load_results(study_dir):
         results = load_results("results/convergence_study")
         psnrs = [metric(r, 'PSNR') for r in results]
     """
-    files = sorted(glob(f"{study_dir}/*/results.zarr"))
+    files = sorted(glob(f"{study_dir}/**/results.zarr", recursive=True))
     if not files:
         raise ValueError(f"No results found in {study_dir}")
     results = []
