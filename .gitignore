@@ -9,6 +9,9 @@ data/
 *.h5
 *.tif
 *.tiff
+figs/
+notes/
+
 
 # Results
 results/
