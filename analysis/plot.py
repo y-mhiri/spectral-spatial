@@ -394,8 +394,8 @@ def spectral_profile(region_yx, gt, output_dir='.', **reconstructions):
     plt.figure(figsize=(10, 4))
 
     mean, std = _stats(gt)
-    plt.plot(bands, mean, 'k-', linewidth=2, label='GT')
-    plt.fill_between(bands, mean - std, mean + std, alpha=0.15, color='k')
+    plt.plot(bands, mean, 'g-', linewidth=2, label='GT')
+    plt.fill_between(bands, mean - std, mean + std, alpha=0.15, color='green')
 
     for name, recon in reconstructions.items():
         mean, std = _stats(recon)
