@@ -32,8 +32,11 @@ run_experiment() {
     local algorithm=$1
     local lmbda=$2
     local lmbda_m=$3
-    local output_dir="$RESULTS_DIR/${algorithm}_lmbda${lmbda}_lmbdaM${lmbda_m}"
-    local session="${algorithm}_lmbda${lmbda}_lmbdaM${lmbda_m}"
+    local noise_level=$4
+    # local sigma_blur=$5
+
+    local output_dir="$RESULTS_DIR/${algorithm}_lmbda${lmbda}_lmbdaM${lmbda_m}_noise${noise_level}"
+    local session="${algorithm}_lmbda${lmbda}_lmbdaM${lmbda_m}_noise${noise_level}"
     local logfile="$output_dir/run.log"
 
     mkdir -p "$output_dir"
@@ -51,8 +54,8 @@ run_experiment() {
             --max_iter      5000 \
             --max_iter_cp   10 \
             --tol           1e-8 \
-            --noise_level   37 \
-            --sigma_blur    8.0 \
+            --noise_level   $noise_level \
+            --sigma_blur    4.0 \
             --threshold_softness 1.0e-5 \
             --scale         4 \
             --device        '$DEVICE' \
@@ -60,12 +63,13 @@ run_experiment() {
     "
 }
 
-
-for lmbda in 0.001 0.01 0.1; do
-    for lmbda_m in 0.0 0.01 1.0; do
-        run_experiment "CTV"       "$lmbda" "$lmbda_m"
-        run_experiment "GradAlign" "$lmbda" "$lmbda_m"
+for noise_level in 30 37; do
+for lmbda in 0.01 0.1; do
+    for lmbda_m in 5.0 8.0; do
+        run_experiment "CTV"       "$lmbda" "$lmbda_m" "$noise_level" 
+        run_experiment "GradAlign" "$lmbda" "$lmbda_m" "$noise_level" 
     done    
+done
 done
 
 echo ""
